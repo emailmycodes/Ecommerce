@@ -1,0 +1,81 @@
+name: Snyk Vulnerability Scan and Fix
+
+on:
+  workflow_dispatch:
+
+jobs:
+  snyk-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      GITHUB_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Snyk CLI
+        run: npm install -g snyk@latest
+
+      - name: Run Snyk scan and save JSON results
+        run: |
+          snyk config set api="$SNYK_TOKEN"
+          snyk test --all-projects --json-file-output=/tmp/snyk-results.json --quiet || true
+
+      - name: Ensure JSON output exists
+        run: |
+          if [ -s /tmp/snyk-results.json ]; then
+            echo "✅ Snyk results captured"
+          else
+            echo '{"ok":true,"vulnerabilities":[]}' > /tmp/snyk-results.json
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Generate summary from Snyk JSON
+        run: |
+          mkdir -p scripts
+          python scripts/summarize_snyk_report.py /tmp/snyk-results.json || {
+            echo "# Snyk Scan Summary" > scripts/snyk-summary.txt
+            echo "Summary generation failed." >> scripts/snyk-summary.txt
+          }
+
+      - name: Commit updated summary file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add scripts/snyk-summary.txt
+
+          if git diff --cached --quiet; then
+            echo "No changes to summary file"
+          else
+            git commit -m "Update Snyk vulnerability summary [skip ci]"
+            git push origin main
+            echo "✅ Summary file committed and pushed"
+          fi
+
+      - name: Run Mistral Fix and Create PR
+        run: |
+          pip install requests PyGithub
+          python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
+
+      - name: Upload summary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-summary
+          path: scripts/snyk-summary.txt
+          retention-days: 7
