@@ -6,7 +6,7 @@ from github import Github
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = os.getenv("GITHUB_REPO")
-SNYK_SUMMARY_PATH = sys.argv[1] if len(sys.argv) > 1 else "scripts/snyk_summary.txt"
+SNYK_SUMMARY_PATH = sys.argv[1] if len(sys.argv) > 1 else "scripts/snyk-summary.txt"
 POM_FILE = "pom.xml"
 
 MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
