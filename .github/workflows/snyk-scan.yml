@@ -30,16 +30,7 @@ jobs:
       - name: Run Snyk scan and save JSON results
         run: |
           snyk config set api="$SNYK_TOKEN"
-          snyk test --file=pom.xml --json-file-output=/tmp/snyk-results.json --quiet || true
-
-      - name: Debug check for Snyk output
-        run: |
-          if [ -f /tmp/snyk-results.json ]; then
-            echo "✅ /tmp/snyk-results.json exists"
-            cat /tmp/snyk-results.json
-          else
-            echo "❌ /tmp/snyk-results.json does not exist"
-          fi
+          snyk test --all-projects --json-file-output=/tmp/snyk-results.json --quiet || true
 
       - name: Ensure JSON output exists
         run: |
@@ -47,6 +38,7 @@ jobs:
             echo "✅ Snyk results captured"
           else
             echo '{"ok":true,"vulnerabilities":[]}' > /tmp/snyk-results.json
+            echo "⚠️ No vulnerabilities found or scan failed. Using fallback empty report."
           fi
 
       - name: Set up Python
@@ -82,9 +74,11 @@ jobs:
           pip install requests PyGithub
           python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
 
-      - name: Upload summary as artifact
+      - name: Upload summary and raw scan as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: snyk-summary
-          path: scripts/snyk-summary.txt
+          name: snyk-scan-artifacts
+          path: |
+            scripts/snyk-summary.txt
+            /tmp/snyk-results.json
           retention-days: 7
