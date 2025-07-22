@@ -48,17 +48,15 @@ jobs:
       - name: Generate summary from Snyk JSON
         run: |
           python scripts/summarize_snyk_report.py /tmp/snyk-results.json || {
-            echo "# Snyk Scan Summary" > snyk-summary.txt
-            echo "Summary generation failed." >> snyk-summary.txt
+            echo "# Snyk Scan Summary" > scripts/snyk-summary.txt
+            echo "Summary generation failed." >> scripts/snyk-summary.txt
           }
 
       - name: Commit updated summary file
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add snyk-summary.txt
-
+          git add scripts/snyk-summary.txt
           if git diff --cached --quiet; then
             echo "No changes to summary file"
           else
@@ -70,11 +68,11 @@ jobs:
       - name: Run Mistral Fix and Create PR
         run: |
           pip install requests PyGithub
-          python scripts/pom_fix_from_report.py snyk-summary.txt
+          python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
 
       - name: Upload summary as artifact
         uses: actions/upload-artifact@v4
         with:
           name: snyk-summary
-          path: snyk-summary.txt
+          path: scripts/snyk-summary.txt
           retention-days: 7
