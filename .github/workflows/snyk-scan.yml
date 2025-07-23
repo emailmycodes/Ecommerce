@@ -3,6 +3,10 @@ name: Snyk Security Scan
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sunday at midnight
 
 jobs:
   security-scan:
@@ -14,28 +18,32 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          java-version: '17' # Use your Spring Boot's Java version
+          java-version: '17'
           distribution: 'temurin'
+          cache: 'maven'
 
-      # For Maven projects:
+      - name: Verify Maven setup
+        run: mvn --version
+
       - name: Run Snyk test (Maven)
         uses: snyk/actions/maven@master
         continue-on-error: true
         with:
           command: test
-          args: --sarif-file-output=snyk.sarif
+          args: --sarif-file-output=snyk.sarif --maven-aggregate-project
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
 
-      # OR for Gradle projects (use one or the other):
-      # - name: Run Snyk test (Gradle)
-      #   uses: snyk/actions/gradle@master
-      #   continue-on-error: true
-      #   with:
-      #     command: test
-      #     args: --sarif-file-output=snyk.sarif
-      #   env:
-      #     SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Run Snyk monitor
+        uses: snyk/actions/maven@master
+        continue-on-error: true
+        with:
+          command: monitor
+          args: --maven-aggregate-project
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
 
       - name: Upload Snyk report as artifact
         uses: actions/upload-artifact@v4
