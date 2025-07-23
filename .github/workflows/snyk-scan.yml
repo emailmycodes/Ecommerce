@@ -18,6 +18,14 @@ jobs:
       - name: Install Snyk
         run: npm install -g snyk@latest
 
+      - name: Verify Snyk Authentication
+        run: snyk auth "$SNYK_TOKEN"
+
+      - name: Print Snyk Organization
+        run: |
+          echo "🔍 Snyk Organization:"
+          snyk config get org || echo "Org not configured"
+
       - name: Run Snyk test and generate JSON
         run: |
           snyk config set api="$SNYK_TOKEN"
@@ -60,7 +68,7 @@ jobs:
       - name: Generate Summary
         run: |
           mkdir -p scripts
-          pip install requests PyGithub
+          pip install -r scripts/requirements.txt || pip install requests PyGithub
           python scripts/summarize_snyk_report.py snyk-results.json || {
             echo "# Snyk Summary" > scripts/snyk-summary.txt
             echo "Failed to generate summary." >> scripts/snyk-summary.txt
@@ -106,7 +114,7 @@ jobs:
             git push origin main
           fi
 
-      - name: Run Mistral Fix Script
+      - name: Run Mistral Fix
         run: |
           pip install requests PyGithub
           python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
