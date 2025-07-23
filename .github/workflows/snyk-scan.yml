@@ -1,4 +1,4 @@
-name: Snyk Vulnerability Scan and Fix
+name: Snyk Vulnerability Scan and Summary
 
 on:
   workflow_dispatch:
@@ -6,102 +6,61 @@ on:
 jobs:
   snyk-scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+
+    permissions:
+      contents: write
+      pull-requests: write
+
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPO: ${{ github.repository }}
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install Snyk
-        run: npm install -g snyk@latest
-
-      - name: Print Snyk Organization
-        run: snyk config set api="$SNYK_TOKEN" && snyk auth && snyk orgs list
-
-      - name: Run Snyk scan
-        run: |
-          snyk test --file=pom.xml --json-file-output=snyk-results.json --quiet || true
-
-      - name: Ensure JSON exists
-        run: |
-          if [ -s snyk-results.json ]; then
-            echo "✅ Results captured"
-          else
-            echo '{"ok":true,"vulnerabilities":[]}' > snyk-results.json
-          fi
-
-      - name: Upload JSON
-        uses: actions/upload-artifact@v4
-        with:
-          name: snyk-json
-          path: snyk-results.json
-          retention-days: 7
-
-  generate-summary:
-    runs-on: ubuntu-latest
-    needs: snyk-scan
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download Snyk JSON
-        uses: actions/download-artifact@v4
-        with:
-          name: snyk-json
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
-      - name: Generate Summary
+      - name: Install dependencies
         run: |
-          mkdir -p scripts
-          python scripts/summarize_snyk_report.py snyk-results.json || {
-            echo "# Snyk Summary" > scripts/snyk-summary.txt
-            echo "Failed to generate summary." >> scripts/snyk-summary.txt
-          }
+          python -m pip install --upgrade pip
+          pip install PyGithub requests
 
-      - name: Upload Summary
+      - name: Install Snyk CLI
+        run: npm install -g snyk@latest
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: List Snyk Organizations
+        run: |
+          snyk config set api="$SNYK_TOKEN"
+          snyk orgs list --json > orgs.json
+          echo "🔍 Snyk Organizations:"
+          cat orgs.json | jq -r '.orgs[].name'
+
+      - name: Run Snyk Scan
+        run: |
+          snyk test --file=pom.xml --json-file-output=snyk-results.json --quiet || true
+
+      - name: Summarize Snyk Report
+        run: |
+          python3 scripts/summarize_snyk_report.py snyk-results.json > scripts/snyk-summary.txt
+        continue-on-error: true
+
+      - name: Upload Snyk Summary
         uses: actions/upload-artifact@v4
         with:
           name: snyk-summary
           path: scripts/snyk-summary.txt
-          retention-days: 7
 
-  fix-and-commit:
-    runs-on: ubuntu-latest
-    needs: generate-summary
-    env:
-      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-      GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-      GITHUB_REPO: ${{ github.repository }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Upload Raw JSON Report
+        uses: actions/upload-artifact@v4
         with:
-          fetch-depth: 0
-
-      - name: Download Summary
-        uses: actions/download-artifact@v4
-        with:
-          name: snyk-summary
-
-      - name: Commit summary
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add scripts/snyk-summary.txt
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Update Snyk summary [skip ci]"
-            git push origin main
-          fi
-
-      - name: Run Mistral Fix
-        run: |
-          pip install requests PyGithub
-          python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
+          name: snyk-json
+          path: snyk-results.json
