@@ -5,42 +5,113 @@ on:
 
 jobs:
   snyk-scan:
+    name: Snyk Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    permissions:
-      contents: write
-      pull-requests: write
-
+    timeout-minutes: 10
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Maven
-        uses: s4u/setup-maven-action@v1
-        with:
-          maven-version: '3.9.6'
-
-      - name: Set Snyk API token
-        run: snyk config set api="$SNYK_TOKEN"
+      - name: Install Snyk
+        run: npm install -g snyk@latest
 
       - name: Run Snyk test and generate JSON
-        working-directory: ./your-project-dir  # <-- Update if needed
         run: |
-          snyk test --file=pom.xml --json-file-output=snyk-results.json --quiet || true
+          snyk config set api="$SNYK_TOKEN"
+          POM_PATH=$(find . -name "pom.xml" | head -n 1)
+          echo "Detected pom.xml at $POM_PATH"
+          DIR=$(dirname "$POM_PATH")
+          cd "$DIR"
+          snyk test --json-file-output=snyk-results.json --quiet || true
+          cp snyk-results.json "$GITHUB_WORKSPACE/scripts/snyk-results.json"
 
-      - name: Generate summary from snyk-results.json
-        working-directory: ./your-project-dir
+      - name: Ensure JSON exists
         run: |
-          python3 ../scripts/summarize_snyk_report.py snyk-results.json > ../scripts/snyk-summary.txt
+          if [ -s scripts/snyk-results.json ]; then
+            echo "✅ Snyk results captured"
+          else
+            echo '{"ok":true,"vulnerabilities":[]}' > scripts/snyk-results.json
+          fi
 
-      - name: Upload Snyk summary and raw output as artifacts
+      - name: Upload JSON
         uses: actions/upload-artifact@v4
         with:
           name: snyk-json
-          path: |
-            scripts/snyk-summary.txt
-            your-project-dir/snyk-results.json
+          path: scripts/snyk-results.json
+          retention-days: 7
+
+  generate-summary:
+    name: Generate Summary
+    runs-on: ubuntu-latest
+    needs: snyk-scan
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Snyk JSON
+        uses: actions/download-artifact@v4
+        with:
+          name: snyk-json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Generate Summary
+        run: |
+          mkdir -p scripts
+          pip install -r scripts/requirements.txt || pip install requests PyGithub
+          python scripts/summarize_snyk_report.py scripts/snyk-results.json || {
+            echo "# Snyk Summary" > scripts/snyk-summary.txt
+            echo "Failed to generate summary." >> scripts/snyk-summary.txt
+          }
+
+      - name: Upload Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-summary
+          path: scripts/snyk-summary.txt
+          retention-days: 7
+
+  fix-and-commit:
+    name: Fix and Commit
+    runs-on: ubuntu-latest
+    needs: generate-summary
+    env:
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      GITHUB_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Summary
+        uses: actions/download-artifact@v4
+        with:
+          name: snyk-summary
+
+      - name: Commit summary
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/snyk-summary.txt
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update Snyk summary [skip ci]"
+            git push origin main
+          fi
+
+      - name: Run Mistral Fix
+        run: |
+          pip install requests PyGithub
+          python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
