@@ -1,7 +1,10 @@
-name: Snyk Vulnerability Scan
+name: Snyk Vulnerability Scan and Fix
 
 on:
   workflow_dispatch:
+
+env:
+  artifactName: snykArtifact
 
 jobs:
   snyk-scan:
@@ -12,7 +15,7 @@ jobs:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout the repo source code
         uses: actions/checkout@v4
 
       - name: Install Snyk CLI
@@ -31,8 +34,83 @@ jobs:
             echo '{"ok":true,"vulnerabilities":[]}' > /tmp/snyk-results.json
           fi
 
-      - name: Upload Snyk JSON report
+      - name: Upload Snyk artifact
         uses: actions/upload-artifact@v4
         with:
-          name: snyk-results-json
+          name: ${{ env.artifactName }}
           path: /tmp/snyk-results.json
+
+  generate-summary:
+    needs: snyk-scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repo source code
+        uses: actions/checkout@v4
+
+      - name: Download Snyk scan results
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.artifactName }}
+          path: /tmp
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Generate Snyk summary
+        run: |
+          mkdir -p scripts
+          python scripts/summarize_snyk_report.py /tmp/snyk-results.json || {
+            echo "# Snyk Scan Summary" > scripts/snyk-summary.txt
+            echo "Summary generation failed." >> scripts/snyk-summary.txt
+          }
+
+      - name: Commit summary to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add scripts/snyk-summary.txt
+          if git diff --cached --quiet; then
+            echo "No changes to summary file"
+          else
+            git commit -m "Update Snyk vulnerability summary [skip ci]"
+            git push origin main
+
+      - name: Upload summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-summary
+          path: scripts/snyk-summary.txt
+
+  auto-fix:
+    needs: generate-summary
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      GITHUB_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Checkout the repo source code
+        uses: actions/checkout@v4
+
+      - name: Download summary
+        uses: actions/download-artifact@v4
+        with:
+          name: snyk-summary
+          path: scripts
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Run Mistral Fix and Create PR
+        run: |
+          pip install requests PyGithub
+          python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
