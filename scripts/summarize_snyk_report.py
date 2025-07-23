@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 
 import json
@@ -8,6 +7,7 @@ from datetime import datetime
 from collections import defaultdict
 
 def load_snyk_results(file_path):
+    """Load and parse Snyk JSON results from a file."""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read().strip()
@@ -18,10 +18,7 @@ def load_snyk_results(file_path):
 
         try:
             data = json.loads(content)
-            if isinstance(data, list):
-                return data
-            else:
-                return [data]
+            return data if isinstance(data, list) else [data]
         except json.JSONDecodeError:
             projects = []
             for line_num, line in enumerate(content.splitlines(), 1):
@@ -32,7 +29,6 @@ def load_snyk_results(file_path):
                     projects.append(json.loads(line))
                 except json.JSONDecodeError as e:
                     print(f"Warning: Invalid JSON on line {line_num}: {e}")
-                    continue
             return projects
 
     except FileNotFoundError:
@@ -43,6 +39,7 @@ def load_snyk_results(file_path):
         return []
 
 def extract_project_info(project):
+    """Extract and structure vulnerability info from project JSON."""
     info = {
         'project_name': project.get('projectName', 'Unknown Project'),
         'package_manager': project.get('packageManager', 'Unknown'),
@@ -61,22 +58,19 @@ def extract_project_info(project):
 
     info['severity_counts'] = dict(severity_counts)
     info['total_vulnerabilities'] = len(info['vulnerabilities'])
-
     return info
 
 def generate_project_summary(project_info):
-    lines = []
+    """Generate a human-readable summary for a single project."""
+    lines = [
+        f"### Project: {project_info['project_name']}",
+        f"- **Package Manager:** {project_info['package_manager']}",
+        f"- **Target File:** {project_info['target_file']}",
+        f"- **Dependencies:** {project_info['dependency_count']}",
+        f"- **Total Vulnerabilities:** {project_info['total_vulnerabilities']}"
+    ]
 
-    lines.append(f"### Project: {project_info['project_name']}")
-    lines.append(f"- **Package Manager:** {project_info['package_manager']}")
-    lines.append(f"- **Target File:** {project_info['target_file']}")
-    lines.append(f"- **Dependencies:** {project_info['dependency_count']}")
-    lines.append(f"- **Total Vulnerabilities:** {project_info['total_vulnerabilities']}")
-
-    if project_info['ok']:
-        lines.append("- **Status:** No vulnerabilities found")
-    else:
-        lines.append("- **Status:** Vulnerabilities detected")
+    lines.append("- **Status:** No vulnerabilities found" if project_info['ok'] else "- **Status:** Vulnerabilities detected")
 
     if project_info['total_vulnerabilities'] > 0:
         lines.append("- **Severity Breakdown:**")
@@ -89,6 +83,7 @@ def generate_project_summary(project_info):
     return "\n".join(lines)
 
 def generate_overall_summary(all_projects):
+    """Generate an overall summary across all scanned projects."""
     total_projects = len(all_projects)
     total_vulnerabilities = sum(p['total_vulnerabilities'] for p in all_projects)
     projects_with_vulns = sum(1 for p in all_projects if p['total_vulnerabilities'] > 0)
@@ -98,13 +93,14 @@ def generate_overall_summary(all_projects):
         for severity, count in project['severity_counts'].items():
             overall_severity[severity] += count
 
-    lines = []
-    lines.append("## Overall Summary")
-    lines.append(f"- **Total Projects Scanned:** {total_projects}")
-    lines.append(f"- **Projects with Vulnerabilities:** {projects_with_vulns}")
-    lines.append(f"- **Projects Clean:** {total_projects - projects_with_vulns}")
-    lines.append(f"- **Total Vulnerabilities:** {total_vulnerabilities}")
-    lines.append("")
+    lines = [
+        "## Overall Summary",
+        f"- **Total Projects Scanned:** {total_projects}",
+        f"- **Projects with Vulnerabilities:** {projects_with_vulns}",
+        f"- **Projects Clean:** {total_projects - projects_with_vulns}",
+        f"- **Total Vulnerabilities:** {total_vulnerabilities}",
+        ""
+    ]
 
     if total_vulnerabilities > 0:
         lines.append("### Vulnerability Distribution by Severity")
@@ -129,139 +125,12 @@ def generate_overall_summary(all_projects):
     return "\n".join(lines)
 
 def generate_recommendations(all_projects):
-    lines = []
-    lines.append("## Recommendations")
-
+    """Provide recommendations based on the severity of vulnerabilities."""
+    lines = ["## Recommendations"]
     total_vulns = sum(p['total_vulnerabilities'] for p in all_projects)
 
     if total_vulns == 0:
-        lines.append("**No action required** - All projects are secure")
-        lines.append("- Continue regular security scanning")
-        lines.append("- Keep dependencies updated")
-    else:
-        lines.append("### Immediate Actions")
-
-        critical_projects = [p for p in all_projects if p['severity_counts'].get('critical', 0) > 0]
-        if critical_projects:
-            lines.append("1. **Address Critical Vulnerabilities:**")
-            for project in critical_projects:
-                crit_count = project['severity_counts'].get('critical', 0)
-                lines.append(f"   - {project['project_name']}: {crit_count} critical issue(s)")
-
-        high_projects = [p for p in all_projects if p['severity_counts'].get('high', 0) > 0]
-        if high_projects:
-            lines.append("2. **Review High Severity Issues:**")
-            for project in high_projects:
-                high_count = project['severity_counts'].get('high', 0)
-                lines.append(f"   - {project['project_name']}: {high_count} high severity issue(s)")
-
-        lines.append("")
-        lines.append("### General Recommendations")
-        lines.append("- Run `snyk fix` to automatically fix known vulnerabilities")
-        lines.append("- Update dependencies to latest secure versions")
-        lines.append("- Review and update security policies")
-        lines.append("- Schedule regular security scans")
-
-    return "\n".join(lines)
-
-def create_summary_report(projects_data):
-    lines = []
-
-    lines.append("# Snyk Vulnerability Scan Summary")
-    lines.append(f"**Generated on:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}")
-    lines.append("")
-
-    if not projects_data:
-        lines.append("## No Data Available")
-        lines.append("No Snyk scan results were found or the results file was empty.")
-        lines.append("This could be due to:")
-        lines.append("- Authentication issues with Snyk")
-        lines.append("- No supported package files found in the repository")
-        lines.append("- Scan timeout or other technical issues")
-        return "\n".join(lines)
-
-    all_projects = []
-    for project_data in projects_data:
-        project_info = extract_project_info(project_data)
-        all_projects.append(project_info)
-
-    lines.append(generate_overall_summary(all_projects))
-    lines.append("")
-
-    if len(all_projects) > 1:
-        lines.append("## Project Details")
-        for project_info in all_projects:
-            lines.append(generate_project_summary(project_info))
-    else:
-        lines.append("## Project Details")
-        lines.append(generate_project_summary(all_projects[0]))
-
-    lines.append(generate_recommendations(all_projects))
-
-    lines.append("")
-    lines.append("---")
-    lines.append("*This report was generated automatically by Snyk vulnerability scanning*")
-
-    return "\n".join(lines)
-
-def create_fallback_summary(error_message):
-    lines = []
-    lines.append("# Snyk Vulnerability Scan Summary")
-    lines.append(f"**Generated on:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}")
-    lines.append("")
-    lines.append("## Error Status")
-    lines.append(f"**Summary generation failed:** {error_message}")
-    lines.append("")
-    lines.append("## Troubleshooting")
-    lines.append("1. Check that Snyk authentication token is valid")
-    lines.append("2. Verify the repository contains supported package files")
-    lines.append("3. Review GitHub Actions workflow logs for detailed error messages")
-    lines.append("4. Ensure the Snyk CLI has proper permissions")
-    lines.append("")
-    lines.append("## Next Steps")
-    lines.append("- Review the workflow logs for specific error details")
-    lines.append("- Manually run `snyk test` in your local environment")
-    lines.append("- Contact your security team if issues persist")
-
-    return "\n".join(lines)
-
-def main():
-    try:
-        if len(sys.argv) < 2:
-            raise ValueError("Usage: python summarize_snyk_report.py <path/to/snyk-results.json>")
-
-        input_file = sys.argv[1]
-        print(f"Processing Snyk results from: {input_file}")
-
-        os.makedirs('scripts', exist_ok=True)
-
-        projects_data = load_snyk_results(input_file)
-        print(f"Loaded {len(projects_data)} project(s) from results file")
-
-        summary_content = create_summary_report(projects_data)
-
-        output_file = 'scripts/snyk-summary.txt'
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(summary_content)
-
-        print(f"Summary report generated successfully: {output_file}")
-
-        if projects_data:
-            total_vulns = sum(len(p.get('vulnerabilities', [])) for p in projects_data)
-            print(f"Summary: {len(projects_data)} projects scanned, {total_vulns} vulnerabilities found")
-
-    except Exception as e:
-        print(f"Error: {e}")
-
-        try:
-            os.makedirs('scripts', exist_ok=True)
-            fallback_content = create_fallback_summary(str(e))
-            with open('scripts/snyk-summary.txt', 'w', encoding='utf-8') as f:
-                f.write(fallback_content)
-            print("Fallback summary created")
-        except Exception as fallback_error:
-            print(f"Failed to create fallback summary: {fallback_error}")
-            sys.exit(1)
-
-if __name__ == "__main__":
-    main()
+        lines += [
+            "**No action required** - All projects are secure",
+            "- Continue regular security scanning",
+            "- Keep dependencies updated
