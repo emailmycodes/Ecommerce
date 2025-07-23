@@ -13,37 +13,51 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Set Working Directory
+        run: |
+          echo "Project files:"
+          ls -la
+          echo "PWD: $(pwd)"
+
+      - name: Ensure Maven is Installed
+        run: mvn -version
+
       - name: Install Snyk CLI
         uses: snyk/actions/setup@master
         with:
           command: snyk-cli
 
-      - name: Run Snyk Test and Save Reports
+      - name: Run Snyk Test
         id: snyk
         continue-on-error: true
         run: |
-          snyk test --json-file-output=snyk_report.json --sarif-file-output=snyk_report.sarif --severity-threshold=high
+          snyk config set api="$SNYK_TOKEN"
+          snyk test --file=pom.xml --json-file-output=snyk_report.json --sarif-file-output=snyk_report.sarif --severity-threshold=high
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
       - name: Upload JSON Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: snyk-report-json
           path: snyk_report.json
 
       - name: Upload SARIF Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: snyk-report-sarif
           path: snyk_report.sarif
 
       - name: Convert JSON Report to HTML
+        if: always()
         run: |
           npm install -g snyk-to-html
           snyk-to-html -i snyk_report.json -o snyk_report.html
 
       - name: Upload HTML Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: snyk-report-html
