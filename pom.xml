@@ -15,58 +15,23 @@
     <!-- ... -->
 
     <dependencies>
-        <!-- ... -->
-
-        <!-- JJWT (JSON Web Token) - Updated to latest secure version -->
+        <!-- Spring Boot Starters -->
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-api</artifactId>
-            <version>0.11.5</version> <!-- Updated JJWT version -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-logging</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-impl</artifactId>
-            <version>0.11.5</version> <!-- Updated JJWT version -->
-            <scope>runtime</scope>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-log4j2</artifactId> <!-- Add Log4j2 dependency -->
         </dependency>
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-jackson</artifactId>
-            <version>0.11.5</version> <!-- Updated JJWT version -->
-            <scope>runtime</scope>
-        </dependency>
-
-        <!-- ... -->
-
-        <!-- Testing (JUnit 5) - Updated to latest version -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.9.1</version> <!-- Updated JUnit 5 version -->
-            <scope>test</scope>
-        </dependency>
-
         <!-- ... -->
     </dependencies>
 
-    <build>
-        <plugins>
-            <!-- ... -->
-
-            <!-- Spring Boot Plugin -->
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>3.0.5</version> <!-- Updated Spring Boot version -->
-                <configuration>
-                    <excludes>
-                        <exclude>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                        </exclude>
-                    </excludes>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
+    <!-- ... -->
 </project>
