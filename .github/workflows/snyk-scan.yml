@@ -107,10 +107,4 @@ jobs:
       - name: Run fix agent
         run: python scripts/pom_fix_from_report.py
 
-      - name: Commit fixed pom1.xml
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pom1.xml
-          git commit -m "fix: apply Mistral AI recommendations to pom1.xml" || echo "No changes to commit"
-          git push
+      # Final git commit and push is intentionally skipped as requested
