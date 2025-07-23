@@ -106,5 +106,3 @@ jobs:
 
       - name: Run fix agent
         run: python scripts/pom_fix_from_report.py
-
-      # Final git commit and push is intentionally skipped as requested
