@@ -1,0 +1,52 @@
+name: Generate Snyk Summary
+
+on:
+  workflow_run:
+    workflows: ["Snyk Vulnerability Scan"]
+    types:
+      - completed
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Snyk scan results
+        uses: actions/download-artifact@v4
+        with:
+          name: snyk-results-json
+          path: /tmp
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Generate summary
+        run: |
+          mkdir -p scripts
+          python scripts/summarize_snyk_report.py /tmp/snyk-results.json || {
+            echo "# Snyk Scan Summary" > scripts/snyk-summary.txt
+            echo "Summary generation failed." >> scripts/snyk-summary.txt
+          }
+
+      - name: Commit summary
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add scripts/snyk-summary.txt
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update Snyk vulnerability summary [skip ci]"
+            git push origin main
+
+      - name: Upload summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-summary
+          path: scripts/snyk-summary.txt
