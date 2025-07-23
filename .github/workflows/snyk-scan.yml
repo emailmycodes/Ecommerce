@@ -8,98 +8,59 @@ jobs:
     name: Snyk Scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Snyk
-        run: npm install -g snyk@latest
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-      - name: Run Snyk test and generate JSON
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
+      - name: Run Snyk scan and generate JSON
         run: |
           snyk config set api="$SNYK_TOKEN"
-          snyk test --file=pom.xml --json-file-output=snyk-results.json --quiet || true
+          snyk test --all-projects --json-file-output=snyk-results.json || true
 
-      - name: Ensure JSON exists
-        run: |
-          if [ -s snyk-results.json ]; then
-            echo "✅ Snyk results captured"
-          else
-            echo '{"ok":true,"vulnerabilities":[]}' > snyk-results.json
-          fi
-
-      - name: Upload Snyk JSON
-        uses: actions/upload-artifact@v4
-        with:
-          name: snyk-json
-          path: snyk-results.json
-          retention-days: 7
-
-  generate-summary:
-    name: Generate Summary
-    runs-on: ubuntu-latest
-    needs: snyk-scan
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download Snyk JSON
-        uses: actions/download-artifact@v4
-        with:
-          name: snyk-json
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Generate Summary
+      - name: Generate summary from Snyk JSON
         run: |
           mkdir -p scripts
-          pip install requests
-          python scripts/summarize_snyk_report.py snyk-results.json || {
-            echo "# Snyk Summary" > scripts/snyk-summary.txt
-            echo "Failed to generate summary." >> scripts/snyk-summary.txt
-          }
+          python3 scripts/summarize_snyk_report.py snyk-results.json scripts/snyk-summary.txt
 
-      - name: Upload Summary
+      - name: Upload summary artifact
         uses: actions/upload-artifact@v4
         with:
           name: snyk-summary
           path: scripts/snyk-summary.txt
-          retention-days: 7
 
   fix-and-commit:
-    name: Fix with Mistral
+    name: Fix Code Using Mistral
     runs-on: ubuntu-latest
-    needs: generate-summary
+    needs: snyk-scan
+
     env:
+      GITHUB_TOKEN: ${{ secrets.PERSONAL_GITHUB_TOKEN }}
       MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-      GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-      GITHUB_REPO: ${{ github.repository }}
+      REPO_NAME: ${{ github.repository }}
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Download Summary
+      - name: Download summary artifact
         uses: actions/download-artifact@v4
         with:
           name: snyk-summary
+          path: scripts
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install dependencies
-        run: pip install requests PyGithub
-
-      - name: Run Mistral Fix
-        run: python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
+      - name: Run Mistral Fix Script
+        run: |
+          pip install -r scripts/requirements.txt
+          python3 scripts/pom_fix_from_report.py scripts/snyk-summary.txt
