@@ -3,12 +3,16 @@ import sys
 import requests
 from github import Github
 
+# Environment variables
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = os.getenv("GITHUB_REPO")
+
+# File paths
 SNYK_SUMMARY_PATH = sys.argv[1] if len(sys.argv) > 1 else "scripts/snyk-summary.txt"
 POM_FILE = "pom.xml"
 
+# Mistral API config
 MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
 HEADERS = {
     "Authorization": f"Bearer {MISTRAL_API_KEY}",
@@ -16,10 +20,12 @@ HEADERS = {
 }
 
 def read_file(file_path):
+    """Reads and returns the contents of a file."""
     with open(file_path, "r") as f:
         return f.read()
 
 def get_fix_from_mistral(summary, pom_content):
+    """Sends the Snyk summary and pom.xml content to Mistral AI and gets the fixed pom.xml."""
     prompt = f"""You are an expert in Java and Maven.
 You are given a Snyk vulnerability summary and the contents of a pom.xml file.
 Update the pom.xml file to fix the vulnerabilities using the summary provided.
@@ -56,8 +62,9 @@ If no changes are needed, return the pom.xml content exactly as is without addin
     return result["choices"][0]["message"]["content"].strip()
 
 def create_branch_and_commit(new_pom, original_pom):
+    """Creates a new branch, commits the updated pom.xml, and opens a pull request."""
     if new_pom.strip() == original_pom.strip():
-        print("✅ No changes needed in pom.xml. Skipping commit and PR.")
+        print("No changes needed in pom.xml. Skipping commit and pull request.")
         return
 
     github = Github(GITHUB_TOKEN)
@@ -86,7 +93,8 @@ def create_branch_and_commit(new_pom, original_pom):
         head=branch,
         base="main"
     )
-    print("✅ PR created successfully.")
+
+    print("Pull request created successfully.")
 
 if __name__ == "__main__":
     summary_text = read_file(SNYK_SUMMARY_PATH)
