@@ -31,7 +31,7 @@ jobs:
             echo '{"ok":true,"vulnerabilities":[]}' > snyk-results.json
           fi
 
-      - name: Upload JSON Artifact
+      - name: Upload JSON
         uses: actions/upload-artifact@v4
         with:
           name: snyk-json
@@ -47,7 +47,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download Snyk JSON Artifact
+      - name: Download Snyk JSON
         uses: actions/download-artifact@v4
         with:
           name: snyk-json
@@ -58,7 +58,8 @@ jobs:
           python-version: '3.x'
 
       - name: Install Python dependencies
-        run: pip install requests PyGithub
+        run: |
+          pip install requests PyGithub
 
       - name: Generate Summary Report
         run: |
@@ -68,7 +69,7 @@ jobs:
             echo "❌ Failed to generate summary." >> scripts/snyk-summary.txt
           }
 
-      - name: Upload Summary Artifact
+      - name: Upload Summary
         uses: actions/upload-artifact@v4
         with:
           name: snyk-summary
@@ -90,30 +91,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download Summary Artifact
+      - name: Download Summary
         uses: actions/download-artifact@v4
         with:
           name: snyk-summary
-          path: scripts
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
 
       - name: Install Python dependencies
-        run: pip install requests PyGithub
+        run: |
+          pip install requests PyGithub
 
-      - name: Commit and Push Summary File
+      - name: Commit Summary
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add scripts/snyk-summary.txt
+
           if git diff --cached --quiet; then
             echo "✅ No changes to commit"
           else
-            git commit -m "Update Snyk summary [skip ci]"
+            git commit -m "🔧 Update Snyk summary [skip ci]"
             git push origin main
+          fi
 
       - name: Run Mistral Fix Script
-        run: python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
+        run: |
+          python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
