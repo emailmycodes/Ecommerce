@@ -1,9 +1,6 @@
 name: Snyk Vulnerability Scan and Fix
 
 on:
-  pull_request:
-    branches: main
-  push:
   workflow_dispatch:
 
 env:
