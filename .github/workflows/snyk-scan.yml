@@ -1,52 +1,69 @@
-name: Snyk Security Scan
+name: Snyk Vulnerability Scan and Summary
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  schedule:
-    - cron: '0 0 * * 0' # Weekly on Sunday at midnight
+    branches: [main]  # Change to 'main' if applicable
 
 jobs:
-  security-scan:
+  snyk-scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v3
+        uses: actions/checkout@v3
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'maven'
+          fetch-depth: 0
 
-      - name: Verify Maven setup
-        run: mvn --version
+      - name: Install Snyk CLI
+        run: npm install -g snyk@latest
 
-      - name: Run Snyk test (Maven)
-        uses: snyk/actions/maven@master
-        continue-on-error: true
-        with:
-          command: test
-          args: --sarif-file-output=snyk.sarif --maven-aggregate-project
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+      - name: Set SNYK_TOKEN
+        run: echo "SNYK_TOKEN=${{ secrets.SNYK_TOKEN }}" >> $GITHUB_ENV
 
-      - name: Run Snyk monitor
-        uses: snyk/actions/maven@master
-        continue-on-error: true
-        with:
-          command: monitor
-          args: --maven-aggregate-project
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+      - name: Make mvnw executable
+        run: |
+          if [ -f "./mvnw" ]; then chmod +x ./mvnw; fi
 
-      - name: Upload Snyk report as artifact
+      - name: Run Snyk and export vulnerabilities
+        run: |
+          snyk test --all-projects --json-file-output=snyk-results.json || true
+          echo "Snyk scan completed. Results saved to snyk-results.json"
+
+      - name: Upload Snyk JSON report
         uses: actions/upload-artifact@v4
         with:
-          name: snyk-security-report
-          path: snyk.sarif
+          name: snyk-json-report
+          path: snyk-results.json
+          retention-days: 7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Run summary generator
+        run: python scripts/summarize_snyk_report.py
+
+      - name: Upload summary report
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-summary-report
+          path: snyk-summary.txt
+          retention-days: 7
+
+      - name: Commit JSON report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add snyk-results.json
+          git commit -m "chore: update Snyk JSON report [skip ci]" || echo "No changes to commit"
+          git push || echo "No changes to push"
+
+      - name: Commit summary report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add snyk-summary.txt
+          git commit -m "chore: update Snyk summary report [skip ci]" || echo "No changes to commit"
+          git push || echo "No changes to push"
