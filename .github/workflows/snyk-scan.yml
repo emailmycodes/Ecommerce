@@ -78,6 +78,7 @@ jobs:
           else
             git commit -m "Update Snyk vulnerability summary [skip ci]"
             git push origin main
+          fi
 
       - name: Upload summary artifact
         uses: actions/upload-artifact@v4
