@@ -12,17 +12,25 @@ jobs:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Install Snyk CLI
         run: npm install -g snyk@latest
 
+      - name: Set Up Java and Maven
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Find and Run Snyk Test
         run: |
           snyk config set api="$SNYK_TOKEN"
-
+          
+          echo "🔍 Searching for pom.xml..."
           POM_PATH=$(find . -name "pom.xml" | head -n 1)
+
           if [ -z "$POM_PATH" ]; then
             echo "❌ No pom.xml found!"
             exit 1
@@ -32,10 +40,15 @@ jobs:
           DIR=$(dirname "$POM_PATH")
           cd "$DIR"
 
-          echo "🔍 Running Snyk test..."
+          echo "🔧 Running mvn dependency tree check..."
+          mvn dependency:tree -DoutputType=dot --batch-mode || {
+            echo "❌ Maven dependency tree failed. Please check Maven installation or plugin version."
+            exit 1
+          }
+
+          echo "🚨 Running Snyk test..."
           snyk test --json-file-output=snyk-results.json --quiet || echo "⚠️ Snyk test completed with issues"
 
-          # Ensure results are moved to scripts folder
           mkdir -p "$GITHUB_WORKSPACE/scripts"
           if [ -f "snyk-results.json" ]; then
             cp snyk-results.json "$GITHUB_WORKSPACE/scripts/snyk-results.json"
@@ -73,7 +86,6 @@ jobs:
         run: |
           mkdir -p scripts
           pip install -r scripts/requirements.txt || pip install requests PyGithub
-
           python scripts/summarize_snyk_report.py scripts/snyk-results.json || {
             echo "# Snyk Summary" > scripts/snyk-summary.txt
             echo "⚠️ Failed to generate summary." >> scripts/snyk-summary.txt
@@ -111,7 +123,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add scripts/snyk-summary.txt
-
           if git diff --cached --quiet; then
             echo "✅ No changes to commit"
           else
