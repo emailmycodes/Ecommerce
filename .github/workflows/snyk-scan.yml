@@ -20,25 +20,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java and Maven
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-
-      - name: Set up Maven
-        uses: s4u/setup-maven-action@v1
-        with:
-          maven-version: '3.9.6'
+          cache: 'maven'  # Automatically sets up Maven & caches dependencies
 
       - name: Install dependencies (skip tests)
-        run: |
-          mvn clean install -DskipTests
+        run: mvn clean install -DskipTests
 
       - name: Authenticate Snyk
         run: snyk config set api="${SNYK_TOKEN}"
 
-      - name: Run Snyk scan
+      - name: Run Snyk test and generate reports
         run: snyk test --json-file-output=snyk_report.json --sarif-file-output=snyk_report.sarif --severity-threshold=high
 
       - name: Upload JSON report
