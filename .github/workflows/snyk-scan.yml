@@ -15,28 +15,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Snyk
+      - name: Install Snyk CLI
         run: npm install -g snyk@latest
 
-      - name: Run Snyk test and generate JSON
+      - name: Find and Run Snyk Test
         run: |
           snyk config set api="$SNYK_TOKEN"
-          POM_PATH=$(find . -name "pom.xml" | head -n 1)
-          echo "Detected pom.xml at $POM_PATH"
-          DIR=$(dirname "$POM_PATH")
-          cd "$DIR"
-          snyk test --json-file-output=snyk-results.json --quiet || true
-          cp snyk-results.json "$GITHUB_WORKSPACE/scripts/snyk-results.json"
 
-      - name: Ensure JSON exists
-        run: |
-          if [ -s scripts/snyk-results.json ]; then
-            echo "✅ Snyk results captured"
-          else
-            echo '{"ok":true,"vulnerabilities":[]}' > scripts/snyk-results.json
+          POM_PATH=$(find . -name "pom.xml" | head -n 1)
+          if [ -z "$POM_PATH" ]; then
+            echo "❌ No pom.xml found!"
+            exit 1
           fi
 
-      - name: Upload JSON
+          echo "✅ Detected pom.xml at $POM_PATH"
+          DIR=$(dirname "$POM_PATH")
+          cd "$DIR"
+
+          echo "🔍 Running Snyk test..."
+          snyk test --json-file-output=snyk-results.json --quiet || echo "⚠️ Snyk test completed with issues"
+
+          # Ensure results are moved to scripts folder
+          mkdir -p "$GITHUB_WORKSPACE/scripts"
+          if [ -f "snyk-results.json" ]; then
+            cp snyk-results.json "$GITHUB_WORKSPACE/scripts/snyk-results.json"
+          else
+            echo '{"ok":true,"vulnerabilities":[]}' > "$GITHUB_WORKSPACE/scripts/snyk-results.json"
+          fi
+
+      - name: Upload JSON Report
         uses: actions/upload-artifact@v4
         with:
           name: snyk-json
@@ -62,13 +69,14 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Generate Summary
+      - name: Generate Snyk Summary
         run: |
           mkdir -p scripts
           pip install -r scripts/requirements.txt || pip install requests PyGithub
+
           python scripts/summarize_snyk_report.py scripts/snyk-results.json || {
             echo "# Snyk Summary" > scripts/snyk-summary.txt
-            echo "Failed to generate summary." >> scripts/snyk-summary.txt
+            echo "⚠️ Failed to generate summary." >> scripts/snyk-summary.txt
           }
 
       - name: Upload Summary
@@ -88,7 +96,7 @@ jobs:
       GITHUB_REPO: ${{ github.repository }}
 
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -98,20 +106,20 @@ jobs:
         with:
           name: snyk-summary
 
-      - name: Commit summary
+      - name: Commit Summary
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add scripts/snyk-summary.txt
 
           if git diff --cached --quiet; then
-            echo "No changes to commit"
+            echo "✅ No changes to commit"
           else
             git commit -m "Update Snyk summary [skip ci]"
             git push origin main
           fi
 
-      - name: Run Mistral Fix
+      - name: Run Mistral-based Fix
         run: |
           pip install requests PyGithub
           python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
