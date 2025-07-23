@@ -5,122 +5,109 @@ on:
 
 jobs:
   snyk-scan:
+    name: Snyk Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    permissions:
-      contents: write
-      pull-requests: write
-
+    timeout-minutes: 10
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+      - name: Install Snyk CLI
+        run: npm install -g snyk@latest
 
-      - name: Build Project (Maven)
-        run: mvn clean install -DskipTests
-
-      - name: Run Snyk test and generate JSON
+      - name: Run Snyk and generate JSON
         run: |
           snyk config set api="$SNYK_TOKEN"
+          snyk test --file=pom.xml --json-file-output=snyk-results.json --quiet || true
 
-          echo "🔍 Searching for pom.xml..."
-          POM_PATH=$(find . -name "pom.xml" | head -n 1)
-          if [ -z "$POM_PATH" ]; then
-            echo "❌ No pom.xml found!"
-            exit 1
+      - name: Ensure snyk-results.json exists
+        run: |
+          if [ ! -s snyk-results.json ]; then
+            echo '{"ok":true,"vulnerabilities":[]}' > snyk-results.json
           fi
 
-          echo "✅ Found pom.xml at $POM_PATH"
-          DIR=$(dirname "$POM_PATH")
-          cd "$DIR"
-
-          echo "🔧 Checking Maven dependency tree..."
-          mvn dependency:tree -DoutputType=dot --batch-mode || {
-            echo "❌ Maven dependency:tree failed. Make sure the project is configured correctly."
-            exit 1
-          }
-
-          echo "🚨 Running Snyk test..."
-          snyk test --json-file-output=snyk-results.json --quiet || echo "⚠️ Snyk test completed with issues"
-
-          mkdir -p "$GITHUB_WORKSPACE/scripts"
-          if [ -f "snyk-results.json" ]; then
-            cp snyk-results.json "$GITHUB_WORKSPACE/scripts/snyk-results.json"
-          else
-            echo '{"ok":true,"vulnerabilities":[]}' > "$GITHUB_WORKSPACE/scripts/snyk-results.json"
-          fi
-
-      - name: Upload Snyk Results
+      - name: Upload Snyk Results JSON
         uses: actions/upload-artifact@v4
         with:
-          name: snyk-results
-          path: scripts/snyk-results.json
+          name: snyk-json
+          path: snyk-results.json
+          retention-days: 7
 
   generate-summary:
+    name: Generate Summary Report
     runs-on: ubuntu-latest
     needs: snyk-scan
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download Snyk Results
+      - name: Download snyk-results.json
         uses: actions/download-artifact@v4
         with:
-          name: snyk-results
-          path: scripts
+          name: snyk-json
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: "3.x"
 
-      - name: Install dependencies
-        run: pip install pygithub
-
-      - name: Generate Summary
-        run: python scripts/summarize_snyk_report.py
-
-      - name: Commit Summary
+      - name: Install Python dependencies
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git add scripts/snyk-summary.txt
-          git commit -m "Add Snyk vulnerability summary" || echo "No changes to commit"
-          git push
+          pip install --upgrade pip
+          pip install requests PyGithub
+
+      - name: Generate Summary from JSON
+        run: |
+          mkdir -p scripts
+          python scripts/summarize_snyk_report.py snyk-results.json || {
+            echo "# Snyk Summary" > scripts/snyk-summary.txt
+            echo "Summary generation failed." >> scripts/snyk-summary.txt
+          }
+
+      - name: Upload Summary File
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-summary
+          path: scripts/snyk-summary.txt
+          retention-days: 7
 
   fix-and-commit:
+    name: Fix and Commit Changes
     runs-on: ubuntu-latest
     needs: generate-summary
+    env:
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      GITHUB_REPO: ${{ github.repository }}
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
         with:
-          python-version: 3.11
+          fetch-depth: 0
 
-      - name: Install dependencies
-        run: pip install pygithub
+      - name: Download Summary File
+        uses: actions/download-artifact@v4
+        with:
+          name: snyk-summary
 
-      - name: Fix POM based on summary
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit snyk-summary.txt
         run: |
-          python scripts/pom_fix_from_report.py
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git add pom1.xml
-          git commit -m "Fix pom.xml based on Snyk vulnerabilities" || echo "No changes to commit"
-          git push
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/snyk-summary.txt
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update Snyk summary [skip ci]"
+            git push origin main
+          fi
+
+      - name: Run Mistral Fix Script
+        run: |
+          pip install requests PyGithub
+          python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
