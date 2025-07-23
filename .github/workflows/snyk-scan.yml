@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Snyk CLI
         uses: snyk/actions/setup@master
@@ -27,13 +27,13 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
       - name: Upload JSON Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: snyk-report-json
           path: snyk_report.json
 
       - name: Upload SARIF Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: snyk-report-sarif
           path: snyk_report.sarif
@@ -44,7 +44,7 @@ jobs:
           snyk-to-html -i snyk_report.json -o snyk_report.html
 
       - name: Upload HTML Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: snyk-report-html
           path: snyk_report.html
