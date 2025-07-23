@@ -1,136 +1,154 @@
 #!/usr/bin/env python3
 
-import json
-import sys
 import os
-from datetime import datetime
+import json
+import logging
+from pathlib import Path
+from typing import List, Dict, Any, Union
 from collections import defaultdict
 
-def load_snyk_results(file_path):
-    """Load and parse Snyk JSON results from a file."""
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read().strip()
+# Configurable paths
+INPUT_FILE = Path("snyk-results.json")
+OUTPUT_FILE = Path("scripts/snyk-summary.txt")
 
+# Setup logging
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+
+def load_snyk_results(file_path: Path) -> List[Dict[str, Any]]:
+    """
+    Load JSON content from the Snyk scan results file.
+    Supports both single JSON and newline-delimited JSON format.
+    """
+    if not file_path.exists():
+        logging.error(f"Snyk result file not found: {file_path}")
+        return []
+
+    try:
+        content = file_path.read_text(encoding="utf-8").strip()
         if not content:
-            print("Warning: Input file is empty")
+            logging.warning("Snyk result file is empty.")
             return []
 
         try:
             data = json.loads(content)
             return data if isinstance(data, list) else [data]
         except json.JSONDecodeError:
-            projects = []
-            for line_num, line in enumerate(content.splitlines(), 1):
+            # Attempt line-by-line parsing (for NDJSON format)
+            parsed_projects = []
+            for line in content.splitlines():
                 line = line.strip()
                 if not line:
                     continue
                 try:
-                    projects.append(json.loads(line))
-                except json.JSONDecodeError as e:
-                    print(f"Warning: Invalid JSON on line {line_num}: {e}")
-            return projects
+                    parsed_projects.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+            return parsed_projects
 
-    except FileNotFoundError:
-        print(f"Error: File not found: {file_path}")
-        return []
     except Exception as e:
-        print(f"Error reading file: {e}")
+        logging.error(f"Failed to load Snyk results: {e}")
         return []
 
-def extract_project_info(project):
-    """Extract and structure vulnerability info from project JSON."""
-    info = {
-        'project_name': project.get('projectName', 'Unknown Project'),
-        'package_manager': project.get('packageManager', 'Unknown'),
-        'target_file': project.get('targetFile', 'Unknown'),
-        'vulnerabilities': project.get('vulnerabilities', []),
-        'dependency_count': project.get('dependencyCount', 0),
-        'ok': project.get('ok', False),
-        'policy': project.get('policy', ''),
-        'path': project.get('path', '')
-    }
 
+def extract_project_info(project: Dict[str, Any]) -> Dict[str, Union[str, int, Dict[str, int], bool]]:
+    """
+    Extract relevant details from a single Snyk project scan.
+    """
     severity_counts = defaultdict(int)
-    for vuln in info['vulnerabilities']:
-        severity = vuln.get('severity', 'unknown').lower()
+    vulnerabilities = project.get("vulnerabilities", [])
+
+    for vuln in vulnerabilities:
+        severity = vuln.get("severity", "unknown").lower()
         severity_counts[severity] += 1
 
-    info['severity_counts'] = dict(severity_counts)
-    info['total_vulnerabilities'] = len(info['vulnerabilities'])
-    return info
+    return {
+        "project_name": project.get("projectName", "Unknown Project"),
+        "package_manager": project.get("packageManager", "Unknown"),
+        "target_file": project.get("targetFile", "Unknown"),
+        "dependency_count": project.get("dependencyCount", 0),
+        "total_vulnerabilities": len(vulnerabilities),
+        "severity_counts": dict(severity_counts),
+        "ok": project.get("ok", False)
+    }
 
-def generate_project_summary(project_info):
-    """Generate a human-readable summary for a single project."""
-    lines = [
-        f"### Project: {project_info['project_name']}",
-        f"- **Package Manager:** {project_info['package_manager']}",
-        f"- **Target File:** {project_info['target_file']}",
-        f"- **Dependencies:** {project_info['dependency_count']}",
-        f"- **Total Vulnerabilities:** {project_info['total_vulnerabilities']}"
-    ]
 
-    lines.append("- **Status:** No vulnerabilities found" if project_info['ok'] else "- **Status:** Vulnerabilities detected")
+def summarize_projects(projects_info: List[Dict[str, Any]]) -> str:
+    """
+    Create a formatted Markdown vulnerability summary for all scanned projects.
+    """
+    total_projects = len(projects_info)
+    total_vulnerabilities = sum(p["total_vulnerabilities"] for p in projects_info)
+    affected_projects = sum(1 for p in projects_info if p["total_vulnerabilities"] > 0)
 
-    if project_info['total_vulnerabilities'] > 0:
-        lines.append("- **Severity Breakdown:**")
-        for severity in ['critical', 'high', 'medium', 'low']:
-            count = project_info['severity_counts'].get(severity, 0)
-            if count > 0:
-                lines.append(f"  - {severity.capitalize()}: {count}")
-
-    lines.append("")
-    return "\n".join(lines)
-
-def generate_overall_summary(all_projects):
-    """Generate an overall summary across all scanned projects."""
-    total_projects = len(all_projects)
-    total_vulnerabilities = sum(p['total_vulnerabilities'] for p in all_projects)
-    projects_with_vulns = sum(1 for p in all_projects if p['total_vulnerabilities'] > 0)
-
-    overall_severity = defaultdict(int)
-    for project in all_projects:
-        for severity, count in project['severity_counts'].items():
-            overall_severity[severity] += count
-
-    lines = [
+    output: List[str] = [
+        "# 🔍 Snyk Vulnerability Summary",
+        "",
         "## Overall Summary",
         f"- **Total Projects Scanned:** {total_projects}",
-        f"- **Projects with Vulnerabilities:** {projects_with_vulns}",
-        f"- **Projects Clean:** {total_projects - projects_with_vulns}",
+        f"- **Projects with Vulnerabilities:** {affected_projects}",
         f"- **Total Vulnerabilities:** {total_vulnerabilities}",
         ""
     ]
 
-    if total_vulnerabilities > 0:
-        lines.append("### Vulnerability Distribution by Severity")
-        for severity in ['critical', 'high', 'medium', 'low']:
-            count = overall_severity.get(severity, 0)
+    # Global severity breakdown
+    global_severity: Dict[str, int] = defaultdict(int)
+    for p in projects_info:
+        for sev, count in p["severity_counts"].items():
+            global_severity[sev] += count
+
+    if total_vulnerabilities:
+        output.append("### Severity Breakdown")
+        for sev in ["critical", "high", "medium", "low"]:
+            count = global_severity.get(sev, 0)
             if count > 0:
-                lines.append(f"- **{severity.capitalize()}:** {count}")
-        lines.append("")
+                output.append(f"- **{sev.capitalize()}:** {count}")
+        output.append("")
 
-        lines.append("### Risk Assessment")
-        if overall_severity.get('critical', 0) > 0:
-            lines.append("**CRITICAL RISK:** Immediate action required due to critical vulnerabilities")
-        elif overall_severity.get('high', 0) > 0:
-            lines.append("**HIGH RISK:** High severity vulnerabilities need prompt attention")
-        elif overall_severity.get('medium', 0) > 0:
-            lines.append("**MEDIUM RISK:** Medium severity vulnerabilities should be addressed")
-        elif overall_severity.get('low', 0) > 0:
-            lines.append("**LOW RISK:** Only low severity vulnerabilities found")
-    else:
-        lines.append("**EXCELLENT:** No vulnerabilities detected across all projects!")
+    # Per project section
+    for project in projects_info:
+        output.extend([
+            f"## 📦 Project: `{project['project_name']}`",
+            f"- **Target File:** `{project['target_file']}`",
+            f"- **Package Manager:** {project['package_manager']}",
+            f"- **Dependencies:** {project['dependency_count']}",
+            f"- **Total Vulnerabilities:** {project['total_vulnerabilities']}"
+        ])
+        if project["total_vulnerabilities"] > 0:
+            output.append("- **Severity Counts:**")
+            for sev in ["critical", "high", "medium", "low"]:
+                count = project["severity_counts"].get(sev, 0)
+                if count > 0:
+                    output.append(f"  - {sev.capitalize()}: {count}")
+        else:
+            output.append("- ✅ No vulnerabilities found.")
+        output.append("")
 
-    return "\n".join(lines)
+    return "\n".join(output)
 
-def generate_recommendations(all_projects):
-    """Provide recommendations based on the severity of vulnerabilities."""
-    lines = ["## Recommendations"]
-    total_vulns = sum(p['total_vulnerabilities'] for p in all_projects)
 
-    if total_vulns == 0:
-        lines += [
-            "**No action required** - All projects are secure",
-            "- Continue regular security scanning",
-            "- Keep dependencies updated
+def write_summary(content: str, output_path: Path) -> None:
+    """
+    Write the summary content to a file.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(content, encoding="utf-8")
+    logging.info(f"Summary written to: {output_path}")
+
+
+def main() -> None:
+    """
+    Main script function.
+    """
+    projects = load_snyk_results(INPUT_FILE)
+    if not projects:
+        logging.warning("No valid Snyk project data to summarize.")
+        return
+
+    projects_info = [extract_project_info(p) for p in projects]
+    summary = summarize_projects(projects_info)
+    write_summary(summary, OUTPUT_FILE)
+
+
+if __name__ == "__main__":
+    main()
