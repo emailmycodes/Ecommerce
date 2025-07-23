@@ -16,9 +16,11 @@ jobs:
       - name: Install Snyk
         run: npm install -g snyk@latest
 
+      - name: Print Snyk Organization
+        run: snyk config set api="$SNYK_TOKEN" && snyk auth && snyk orgs list
+
       - name: Run Snyk scan
         run: |
-          snyk config set api="$SNYK_TOKEN"
           snyk test --file=pom.xml --json-file-output=snyk-results.json --quiet || true
 
       - name: Ensure JSON exists
