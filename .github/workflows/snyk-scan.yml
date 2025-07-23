@@ -27,28 +27,22 @@ jobs:
       - name: Find and Run Snyk Test
         run: |
           snyk config set api="$SNYK_TOKEN"
-          
           echo "🔍 Searching for pom.xml..."
           POM_PATH=$(find . -name "pom.xml" | head -n 1)
-
           if [ -z "$POM_PATH" ]; then
             echo "❌ No pom.xml found!"
             exit 1
           fi
-
           echo "✅ Detected pom.xml at $POM_PATH"
           DIR=$(dirname "$POM_PATH")
           cd "$DIR"
-
           echo "🔧 Running mvn dependency tree check..."
           mvn dependency:tree -DoutputType=dot --batch-mode || {
-            echo "❌ Maven dependency tree failed. Please check Maven installation or plugin version."
+            echo "❌ Maven dependency tree failed."
             exit 1
           }
-
           echo "🚨 Running Snyk test..."
-          snyk test --json-file-output=snyk-results.json --quiet || echo "⚠️ Snyk test completed with issues"
-
+          snyk test --file="$POM_PATH" --json-file-output=snyk-results.json --quiet || echo "⚠️ Snyk test completed with issues"
           mkdir -p "$GITHUB_WORKSPACE/scripts"
           if [ -f "snyk-results.json" ]; then
             cp snyk-results.json "$GITHUB_WORKSPACE/scripts/snyk-results.json"
