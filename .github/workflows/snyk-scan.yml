@@ -1,64 +1,54 @@
-name: Snyk Scan and Report
+name: Snyk Vulnerability Scan and Fix
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
-  security:
+  snyk-scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set Working Directory
-        run: |
-          echo "Project files:"
-          ls -la
-          echo "PWD: $(pwd)"
-
-      - name: Ensure Maven is Installed
-        run: mvn -version
-
-      - name: Install Snyk CLI
-        uses: snyk/actions/setup@master
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
-          command: snyk-cli
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Run Snyk Test
-        id: snyk
-        continue-on-error: true
+      - name: Set up Maven
+        uses: s4u/setup-maven-action@v1
+        with:
+          maven-version: '3.9.6'
+
+      - name: Install dependencies (skip tests)
         run: |
-          snyk config set api="$SNYK_TOKEN"
-          snyk test --file=pom.xml --json-file-output=snyk_report.json --sarif-file-output=snyk_report.sarif --severity-threshold=high
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          mvn clean install -DskipTests
 
-      - name: Upload JSON Report
-        if: always()
+      - name: Authenticate Snyk
+        run: snyk config set api="${SNYK_TOKEN}"
+
+      - name: Run Snyk scan
+        run: snyk test --json-file-output=snyk_report.json --sarif-file-output=snyk_report.sarif --severity-threshold=high
+
+      - name: Upload JSON report
         uses: actions/upload-artifact@v4
         with:
-          name: snyk-report-json
+          name: snyk-json-report
           path: snyk_report.json
 
-      - name: Upload SARIF Report
-        if: always()
+      - name: Upload SARIF report
         uses: actions/upload-artifact@v4
         with:
-          name: snyk-report-sarif
+          name: snyk-sarif-report
           path: snyk_report.sarif
-
-      - name: Convert JSON Report to HTML
-        if: always()
-        run: |
-          npm install -g snyk-to-html
-          snyk-to-html -i snyk_report.json -o snyk_report.html
-
-      - name: Upload HTML Report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: snyk-report-html
-          path: snyk_report.html
