@@ -3,16 +3,12 @@ import sys
 import requests
 from github import Github
 
-# Environment variables
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = os.getenv("GITHUB_REPO")
-
-# File paths
-SNYK_SUMMARY_PATH = sys.argv[1] if len(sys.argv) > 1 else "scripts/snyk-summary.txt"
+SNYK_SUMMARY_PATH = "scripts/snyk-summary.txt"
 POM_FILE = "pom.xml"
 
-# Mistral API config
 MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
 HEADERS = {
     "Authorization": f"Bearer {MISTRAL_API_KEY}",
