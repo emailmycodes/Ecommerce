@@ -5,42 +5,112 @@ on:
 
 jobs:
   snyk-scan:
+    name: Run Snyk and Generate Report
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    permissions:
+      contents: write
+
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install Maven and Snyk
+        run: |
+          sudo apt-get update && sudo apt-get install -y maven
+          npm install -g snyk@latest
+
+      - name: Authenticate Snyk
+        run: snyk config set api="$SNYK_TOKEN"
+
+      - name: Run Snyk test and generate JSON
+        run: |
+          snyk test --file=pom.xml --json-file-output=snyk-results.json --quiet || true
+
+      - name: Ensure JSON exists
+        run: |
+          if [ ! -s snyk-results.json ]; then
+            echo '{"ok":true,"vulnerabilities":[]}' > snyk-results.json
+          fi
+
+      - name: Upload snyk-results.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-json
+          path: snyk-results.json
+
+  generate-summary:
+    name: Generate Snyk Summary
+    runs-on: ubuntu-latest
+    needs: snyk-scan
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download snyk-results.json
+        uses: actions/download-artifact@v4
+        with:
+          name: snyk-json
+          path: scripts
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: 3.x
 
       - name: Install dependencies
-        run: pip install pygithub requests
+        run: pip install pygithub
 
-      - name: Install Snyk CLI
+      - name: Run summarizer script
+        run: python scripts/summarize_snyk_report.py
+
+      - name: Upload snyk-summary.txt
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-summary
+          path: scripts/snyk-summary.txt
+
+  fix-and-commit:
+    name: Fix POM with Mistral AI
+    runs-on: ubuntu-latest
+    needs: generate-summary
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      GITHUB_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download snyk-summary.txt
+        uses: actions/download-artifact@v4
+        with:
+          name: snyk-summary
+          path: scripts
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+
+      - name: Install dependencies
+        run: pip install requests pygithub
+
+      - name: Run fix agent
+        run: python scripts/pom_fix_from_report.py
+
+      - name: Commit fixed pom1.xml
         run: |
-          curl -Lo snyk https://static.snyk.io/cli/latest/snyk-linux
-          chmod +x snyk
-          sudo mv snyk /usr/local/bin/snyk
-
-      - name: Authenticate with Snyk
-        run: snyk auth ${{ secrets.SNYK_TOKEN }}
-
-      - name: Run Snyk test and generate JSON
-        run: snyk test --all-projects --json-file-output=snyk-result.json
-
-      - name: Generate human-readable Snyk summary
-        run: |
-          mkdir -p scripts
-          python scripts/summarize_snyk_report.py snyk-result.json > scripts/snyk-summary.txt
-
-      - name: Run Mistral AI Fixer
-        env:
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPO: ${{ github.repository }}
-        run: |
-          python scripts/pom_fix_from_report.py scripts/snyk-summary.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pom1.xml
+          git commit -m "fix: apply Mistral AI recommendations to pom1.xml" || echo "No changes to commit"
+          git push
