@@ -3,7 +3,6 @@ name: Snyk Security Scan
 on:
   push:
     branches: [ main ]
- 
 
 jobs:
   security-scan:
@@ -18,23 +17,25 @@ jobs:
           java-version: '17' # Use your Spring Boot's Java version
           distribution: 'temurin'
 
-      - name: Run Snyk test
-        uses: snyk/actions/java@master
-        continue-on-error: true # Continue if vulnerabilities found
+      # For Maven projects:
+      - name: Run Snyk test (Maven)
+        uses: snyk/actions/maven@master
+        continue-on-error: true
         with:
           command: test
-          args: --sarif-file-output=snyk.sarif --all-projects
+          args: --sarif-file-output=snyk.sarif
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      - name: Run Snyk monitor
-        uses: snyk/actions/java@master
-        continue-on-error: true
-        with:
-          command: monitor
-          args: --all-projects
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      # OR for Gradle projects (use one or the other):
+      # - name: Run Snyk test (Gradle)
+      #   uses: snyk/actions/gradle@master
+      #   continue-on-error: true
+      #   with:
+      #     command: test
+      #     args: --sarif-file-output=snyk.sarif
+      #   env:
+      #     SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
       - name: Upload Snyk report as artifact
         uses: actions/upload-artifact@v4
