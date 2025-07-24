@@ -41,6 +41,7 @@ Your task is:
 - Do not modify any other dependencies or content in the pom.xml under any circumstance.
 - Do not add any comments, logs, whitespace changes, or extra lines.
 - Return only the updated `pom.xml` content exactly as expected by Maven.
+- Add the comments to changes with clear reason if there is any changes.
 
 ### Vulnerability Summary:
 {summary}
