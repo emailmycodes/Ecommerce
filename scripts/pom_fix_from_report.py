@@ -35,13 +35,14 @@ def get_fix_from_mistral(summary, pom_content):
 You are provided with:
 1. A vulnerability summary from Snyk.
 2. The contents of a `pom.xml` file.
-
 Your task is:
-- Only update dependencies that are explicitly mentioned in the vulnerability summary.
-- Do not modify any other dependencies or content in the pom.xml under any circumstance.
-- Do not add any comments, logs, whitespace changes, or extra lines.
-- Return only the updated `pom.xml` content exactly as expected by Maven.
-- Add the comments to changes with clear reason if there is any changes.
+- ONLY update the dependencies that are explicitly mentioned in the vulnerability summary.
+- For each updated dependency, add a comment directly above it explaining why the version was changed. Include references like CVE ID or a brief note like "recommended by Snyk".
+- DO NOT modify any other dependencies or content in the pom.xml — no formatting, indentation, plugin, or configuration changes.
+- DO NOT add, remove, or reorder any dependencies not included in the vulnerability summary.
+- DO NOT add any explanation outside the pom.xml.
+- Return ONLY the updated `pom.xml` with comments, nothing else.
+- Ensure the output is a Maven-valid `pom.xml`.
 
 ### Vulnerability Summary:
 {summary}
