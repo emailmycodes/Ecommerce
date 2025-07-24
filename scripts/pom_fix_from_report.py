@@ -30,8 +30,6 @@ def get_fix_from_mistral(summary, pom_content):
     Sends the Snyk summary and pom.xml content to Mistral AI and gets the fixed pom.xml.
     Ensures only affected dependencies are upgraded to latest secure versions.
     """
-    prompt_template = read_file(PROMPT_TEMPLATE_PATH)
-    prompt = prompt_template.replace("{{SNYK_SUMMARY}}", summary).replace("{{POM_CONTENT}}", pom_content)
 
     body = {
         "model": "mistral-small",
