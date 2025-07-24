@@ -10,6 +10,7 @@ REPO_NAME = os.getenv("GITHUB_REPO")
 
 # File paths
 SNYK_SUMMARY_PATH = sys.argv[1] if len(sys.argv) > 1 else "scripts/snyk-summary.txt"
+PROMPT_TEMPLATE_PATH = "scripts/agent-prompt.txt"
 POM_FILE = "pom.xml"
 
 # Mistral API config
@@ -29,31 +30,6 @@ def get_fix_from_mistral(summary, pom_content):
     Sends the Snyk summary and pom.xml content to Mistral AI and gets the fixed pom.xml.
     Ensures only affected dependencies are upgraded to latest secure versions.
     """
-    prompt = f"""
-You are an expert in Java, Maven, and Spring Boot dependency management.
-
-You are provided with:
-1. A vulnerability summary from Snyk.
-2. The contents of a `pom.xml` file.
-
-Your task:
-- ONLY update the dependencies that are explicitly mentioned in the vulnerability summary.
-- DO NOT downgrade any version under any circumstance.
-- Update to the latest secure and compatible version available online, suitable for Spring Boot projects if applicable.
-- For each updated dependency, add a comment directly above it, explaining why it was changed (e.g., "Updated due to CVE-2023-XXXX, as recommended by Snyk").
-- DO NOT modify any other part of the pom.xml — no reordering, indentation, formatting, plugins, or additional configuration changes.
-- DO NOT add or remove any dependencies not explicitly listed in the summary.
-- DO NOT include any explanation or output outside the pom.xml.
-- Return ONLY the updated pom.xml content, as valid XML.
-
-### Vulnerability Summary:
-{summary}
-
-### Original pom.xml:
-{pom_content}
-
-### Updated pom.xml with justified secure upgrades:
-"""
 
     body = {
         "model": "mistral-small",
