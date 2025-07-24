@@ -19,30 +19,32 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-
 def read_file(file_path):
     """Reads and returns the contents of a file."""
     with open(file_path, "r") as f:
         return f.read()
 
-
 def get_fix_from_mistral(summary, pom_content):
     """
     Sends the Snyk summary and pom.xml content to Mistral AI and gets the fixed pom.xml.
-    Only modifies dependencies explicitly mentioned in the summary.
+    Ensures only affected dependencies are upgraded to latest secure versions.
     """
-    prompt = f"""You are an expert in Java and Maven.
+    prompt = f"""
+You are an expert in Java, Maven, and Spring Boot dependency management.
+
 You are provided with:
 1. A vulnerability summary from Snyk.
 2. The contents of a `pom.xml` file.
-Your task is:
+
+Your task:
 - ONLY update the dependencies that are explicitly mentioned in the vulnerability summary.
-- For each updated dependency, add a comment directly above it explaining why the version was changed. Include references like CVE ID or a brief note like "recommended by Snyk".
-- DO NOT modify any other dependencies or content in the pom.xml — no formatting, indentation, plugin, or configuration changes.
-- DO NOT add, remove, or reorder any dependencies not included in the vulnerability summary.
-- DO NOT add any explanation outside the pom.xml.
-- Return ONLY the updated `pom.xml` with comments, nothing else.
-- Ensure the output is a Maven-valid `pom.xml`.
+- DO NOT downgrade any version under any circumstance.
+- Update to the latest secure and compatible version available online, suitable for Spring Boot projects if applicable.
+- For each updated dependency, add a comment directly above it, explaining why it was changed (e.g., "Updated due to CVE-2023-XXXX, as recommended by Snyk").
+- DO NOT modify any other part of the pom.xml — no reordering, indentation, formatting, plugins, or additional configuration changes.
+- DO NOT add or remove any dependencies not explicitly listed in the summary.
+- DO NOT include any explanation or output outside the pom.xml.
+- Return ONLY the updated pom.xml content, as valid XML.
 
 ### Vulnerability Summary:
 {summary}
@@ -50,14 +52,15 @@ Your task is:
 ### Original pom.xml:
 {pom_content}
 
-### Updated pom.xml (ONLY with relevant changes, no explanations or other edits):"""
+### Updated pom.xml with justified secure upgrades:
+"""
 
     body = {
         "model": "mistral-small",
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful AI that improves Java pom.xml files based strictly on Snyk vulnerability summaries."
+                "content": "You are a helpful assistant that only upgrades Java Maven dependencies listed in a Snyk vulnerability summary to their secure latest versions, preserving structure and compatibility."
             },
             {
                 "role": "user",
@@ -73,7 +76,6 @@ Your task is:
     response.raise_for_status()
     result = response.json()
     return result["choices"][0]["message"]["content"].strip()
-
 
 def create_branch_and_commit(new_pom, original_pom):
     """
@@ -97,21 +99,20 @@ def create_branch_and_commit(new_pom, original_pom):
     pom_file = repo.get_contents(POM_FILE, ref=branch)
     repo.update_file(
         POM_FILE,
-        "fix: update pom.xml based on Snyk vulnerabilities",
+        "fix: update pom.xml based on Snyk vulnerabilities using Mistral",
         new_pom,
         pom_file.sha,
         branch=branch
     )
 
     repo.create_pull(
-        title="fix: auto-update pom.xml via Mistral AI",
-        body="This PR includes automatic fixes to `pom.xml` based on Snyk vulnerabilities using Mistral AI.",
+        title="fix: auto-update pom.xml via Mistral AI (Snyk fixes)",
+        body="This PR includes secure dependency upgrades in `pom.xml` based on Snyk vulnerability summary, powered by Mistral AI.",
         head=branch,
         base="main"
     )
 
-    print("Pull request created successfully.")
-
+    print("✅ Pull request created successfully.")
 
 if __name__ == "__main__":
     summary_text = read_file(SNYK_SUMMARY_PATH)
