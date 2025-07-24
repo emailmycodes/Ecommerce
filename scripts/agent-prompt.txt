@@ -1,12 +1,1 @@
-You are an expert in Java and Maven.
-You are given a Snyk vulnerability summary and the contents of a pom.xml file.
-Update the pom.xml file to fix the vulnerabilities using the summary provided.
-If no changes are needed, return the pom.xml content exactly as is without adding any comments.
 
-### Vulnerability Summary:
-{{SNYK_SUMMARY}}
-
-### Original pom.xml:
-{{POM_CONTENT}}
-
-### Updated pom.xml:
