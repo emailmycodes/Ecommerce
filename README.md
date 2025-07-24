@@ -118,6 +118,9 @@ Other non-listed or low-priority issues are untouched.
 
 🌐 Multi-file support (requirements.txt, package.json, etc.)
 
+<img width="774" height="494" alt="image" src="https://github.com/user-attachments/assets/9bcbfff1-efbe-4bca-b5f6-72fff8fb533f" />
+
+
 
 
 
