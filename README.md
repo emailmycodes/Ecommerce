@@ -11,21 +11,7 @@ This project automates the process of identifying and fixing vulnerabilities in 
 The system ensures only **listed vulnerabilities are fixed**, keeping the rest of the code untouched and secure.
 
 ---
-
-## 📂 Folder Structure
-
-.
-├── .github/workflows/
-│ ├── snyk-scan.yml
-│ ├── generate-summary.yml
-│ └── fix-and-commit.yml
-├── scripts/
-│ ├── summarize_snyk_report.py
-│ └── pom_fix_from_report.py
-├── pom.xml
-└── snyk-summary.txt (auto-generated)
-
-
+<img width="774" height="494" alt="image" src="https://github.com/user-attachments/assets/11328bd1-9470-4cf9-822b-8121ce66a96f" />
 
 ---
 
