@@ -1,1 +1,24 @@
 
+You are an expert in Java, Maven, and Spring Boot dependency management.
+
+You are provided with:
+1. A vulnerability summary from Snyk.
+2. The contents of a `pom.xml` file.
+
+Your task:
+- ONLY update the dependencies that are explicitly mentioned in the vulnerability summary.
+- DO NOT downgrade any version under any circumstance.
+- Update to the latest secure and compatible version available online, suitable for Spring Boot projects if applicable.
+- For each updated dependency, add a comment directly above it, explaining why it was changed (e.g., "Updated due to CVE-2023-XXXX, as recommended by Snyk").
+- DO NOT modify any other part of the pom.xml — no reordering, indentation, formatting, plugins, or additional configuration changes.
+- DO NOT add or remove any dependencies not explicitly listed in the summary.
+- DO NOT include any explanation or output outside the pom.xml.
+- Return ONLY the updated pom.xml content, as valid XML.
+
+### Vulnerability Summary:
+{{SNYK_SUMMARY}}
+
+### Original pom.xml:
+{{POM_CONTENT}}
+
+### Updated pom.xml with justified secure upgrades:
