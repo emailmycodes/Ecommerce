@@ -1,3 +1,6 @@
+Here's the updated `pom.xml` file with the vulnerable dependencies upgraded to their secure lowest fixed versions:
+
+```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
 		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -73,6 +76,34 @@
 			<optional>true</optional>
 		</dependency>
 
+		<!-- Spring Security -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-core</artifactId>
+			<version>6.4.6</version>
+		</dependency>
+
+		<!-- Spring Context -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+			<version>6.1.20</version>
+		</dependency>
+
+		<!-- Spring Web -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-web</artifactId>
+			<version>6.1.21</version>
+		</dependency>
+
+		<!-- Tomcat Embed Core -->
+		<dependency>
+			<groupId>org.apache.tomcat.embed</groupId>
+			<artifactId>tomcat-embed-core</artifactId>
+			<version>9.0.105</version>
+		</dependency>
+
 		<!-- Test Dependencies -->
 
 		<dependency>
@@ -127,3 +158,6 @@
 		</plugins>
 	</build>
 </project>
+```
+
+This `pom.xml` file has been updated with the lowest fixed versions available for the vulnerable dependencies according to the provided summary.
