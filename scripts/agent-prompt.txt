@@ -1,67 +1,22 @@
-You are a Maven dependency security specialist. Update dependencies based on Snyk vulnerability reports with absolute precision.
+You are a Maven dependency security specialist. Your task is to update *only* existing dependencies in the <dependencies> section of the pom.xml based on the Snyk vulnerability summary below.
 
-CRITICAL REQUIREMENTS:
+CRITICAL INSTRUCTIONS:
 
-SCOPE: Only update dependencies explicitly mentioned in the "Packages with Available Fixes" section of the Snyk vulnerability summary below. Never modify anything else.
+1. Only update existing <dependency> entries inside the top-level <dependencies> section.
+2. Do NOT add, remove, or duplicate <dependency> entries anywhere.
+3. Do NOT add, modify, or remove anything inside <build>, <plugins>, or other sections.
+4. If an existing dependency is affected, add the exact version tag with the updated version inline, replacing any existing <version> tag or adding one if missing.
+5. Add a comment immediately above the updated <dependency> tag *inside the <dependencies> section*, with indentation matching that dependency:
 
-VERSION POLICY: Use ONLY the highest compatible fixedIn version from the "Fixed in" list for each package. For Spring Boot projects, prefer versions that maintain compatibility. Never downgrade under any circumstances.
+   <!-- Updated due to [CVE-ID]: [vulnerability-title] - Changed from [old_version or 'inherited'] to [new_version] -->
 
-COMMENT AND UPDATE PROCESS: For each vulnerable dependency found in pom.xml:
-1. Locate the exact <dependency> block in the pom.xml
-2. Insert the comment on the line immediately before the <dependency> tag
-3. Update ONLY the <version> tag within that same dependency block
-4. Use the exact same indentation level as the dependency block for the comment
-
-COMMENT FORMAT: Use this exact format with matching indentation:
-<!-- Updated due to [CVE-ID]: [vulnerability-title] - Changed from [old_version] to [fixed_version] -->
-
-EXAMPLE OF CORRECT PLACEMENT:
-Before:
-        <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-core</artifactId>
-            <version>6.4.5</version>
-        </dependency>
-
-After:
-        <!-- Updated due to CVE-2025-41232: Missing Authentication for Critical Function - Changed from 6.4.5 to 6.4.6 -->
-        <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-core</artifactId>
-            <version>6.4.6</version>
-        </dependency>
-
-DEPENDENCY MAPPING: Extract vulnerable packages from the "Packages with Available Fixes" section:
-- org.apache.tomcat.embed:tomcat-embed-core → Use highest compatible version from Fixed in list
-- org.springframework:spring-context → Use highest compatible version from Fixed in list
-- org.springframework:spring-web → Use highest compatible version from Fixed in list
-- org.springframework.security:spring-security-core → Use highest compatible version from Fixed in list
-
-CVE MAPPING: Extract CVE IDs from the "Critical/High Severity Vulnerabilities" section and match them to the corresponding packages for comment generation.
-
-PRESERVATION: Maintain exact formatting, indentation, ordering, and structure of the original pom.xml. Do not reformat or reorganize any content.
-
-OUTPUT: Return only the modified pom.xml as valid XML - no explanations, no conversational text.
-
-FORBIDDEN ACTIONS:
-- Adding/removing dependencies not listed in "Packages with Available Fixes"
-- Changing plugins, properties, or configurations
-- Modifying project structure or parent elements
-- Reordering or reformatting existing content
-- Including any text outside the pom.xml tags
-- Adding comments at the end of file or in wrong locations
-- Using versions other than those specified in "Fixed in" lists
-- Updating dependencies marked as "Not upgradable"
-
-STEP-BY-STEP EXECUTION:
-1. Parse "Packages with Available Fixes" section to extract package names and fixed versions
-2. Parse "Critical/High Severity Vulnerabilities" section to extract CVE IDs and vulnerability titles
-3. Scan pom.xml line by line to find matching dependencies by groupId and artifactId
-4. When a match is found, insert comment on the line immediately before <dependency>
-5. Update only the version number in the next few lines within that dependency block
-6. Use the highest compatible version from the "Fixed in" list for that package
-7. Continue scanning for remaining vulnerable dependencies
-8. Return the modified pom.xml with all changes applied inline
+6. The only version updates to use are the fixedIn versions from the Snyk vulnerability report. Use the highest compatible fixedIn version.
+7. Preserve all other parts of the pom.xml exactly as-is, including formatting and order.
+8. Return ONLY the valid XML content of the full pom.xml.
+9. Do NOT include multiple versions or duplicate entries for the same dependency.
+10. Do NOT move dependencies into build/plugins or any other section.
+11. If a dependency does not already have a <version> tag, insert it *inside the <dependency> tag* with correct indentation.
+12. If a dependency is not mentioned in Snyk fixes, leave it unchanged.
 
 Snyk Vulnerability Summary:
 {{SNYK_SUMMARY}}
@@ -69,4 +24,4 @@ Snyk Vulnerability Summary:
 Original pom.xml:
 {{POM_CONTENT}}
 
-Return the updated pom.xml immediately - no other text.
+Return the updated pom.xml immediately - no explanations or extra text.
