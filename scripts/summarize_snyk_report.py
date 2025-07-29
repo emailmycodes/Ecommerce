@@ -1,8 +1,8 @@
+# Revised script that includes `fixedIn` versions from the vulnerabilities and excludes any prompt or extra content.
 
 import os
 import json
 import logging
-import requests
 from pathlib import Path
 from typing import List, Dict, Any, Union
 from collections import defaultdict
@@ -40,42 +40,23 @@ def load_snyk_results(file_path: Path) -> List[Dict[str, Any]]:
                 except json.JSONDecodeError:
                     continue
             return parsed_projects
-
     except Exception as e:
         logging.error(f"Failed to load Snyk results: {e}")
         return []
 
 
-def get_latest_version_from_maven(group: str, artifact: str) -> str:
-    try:
-        url = f"https://search.maven.org/solrsearch/select?q=g:{group}+AND+a:{artifact}&rows=1&wt=json"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            docs = data.get("response", {}).get("docs", [])
-            if docs:
-                return docs[0].get("latestVersion", "Unknown")
-    except Exception as e:
-        logging.warning(f"Could not fetch version for {group}:{artifact} - {e}")
-    return "Unknown"
-
-
 def extract_project_info(project: Dict[str, Any]) -> Dict[str, Union[str, int, Dict[str, int], bool, List[str]]]:
     severity_counts = defaultdict(int)
     vulnerabilities = project.get("vulnerabilities", [])
-    latest_versions = []
+    fixed_versions = []
 
     for vuln in vulnerabilities:
         severity = vuln.get("severity", "unknown").lower()
         severity_counts[severity] += 1
 
-        pkg_info = vuln.get("from", [])
-        if pkg_info and ":" in pkg_info[-1]:
-            parts = pkg_info[-1].split(":")
-            if len(parts) == 3:  # group:artifact:version
-                group, artifact, _ = parts
-                latest = get_latest_version_from_maven(group, artifact)
-                latest_versions.append(f"{group}:{artifact} → {latest}")
+        fixed_in = vuln.get("fixedIn", [])
+        if isinstance(fixed_in, list):
+            fixed_versions.extend(fixed_in)
 
     return {
         "project_name": project.get("projectName", "Unknown Project"),
@@ -84,7 +65,7 @@ def extract_project_info(project: Dict[str, Any]) -> Dict[str, Union[str, int, D
         "dependency_count": project.get("dependencyCount", 0),
         "total_vulnerabilities": len(vulnerabilities),
         "severity_counts": dict(severity_counts),
-        "latest_versions": list(set(latest_versions)),
+        "fixed_versions": sorted(set(fixed_versions)),
         "ok": project.get("ok", False)
     }
 
@@ -131,10 +112,10 @@ def summarize_projects(projects_info: List[Dict[str, Any]]) -> str:
                 count = project["severity_counts"].get(sev, 0)
                 if count > 0:
                     output.append(f"  - {sev.capitalize()}: {count}")
-            if project["latest_versions"]:
-                output.append("- **Latest Available Versions:**")
-                for item in project["latest_versions"]:
-                    output.append(f"  - {item}")
+            if project["fixed_versions"]:
+                output.append("- **Fixed In Versions:**")
+                for version in project["fixed_versions"]:
+                    output.append(f"  - {version}")
         else:
             output.append("- ✅ No vulnerabilities found.")
         output.append("")
