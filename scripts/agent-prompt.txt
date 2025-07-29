@@ -6,26 +6,37 @@ SCOPE: Only update dependencies explicitly mentioned in the Snyk vulnerability s
 
 VERSION POLICY: Only upgrade to secure versions - never downgrade under any circumstances.
 
-COMMENT FORMAT: Add this exact comment above each updated dependency:
+COMMENT PLACEMENT: Add the comment immediately above each dependency that you modify, maintaining the exact same indentation as the dependency block:
+        <!-- Updated due to [CVE-ID]: [vulnerability-title] - Changed from [old_version] to [new_version] -->
+        <dependency>
+            <groupId>...</groupId>
+            <artifactId>...</artifactId>
+            <version>[new_version]</version>
+        </dependency>
 
 PRESERVATION: Maintain exact formatting, indentation, ordering, and structure of the original pom.xml.
 
 OUTPUT: Return only the modified pom.xml as valid XML - no explanations, no conversational text.
 
 FORBIDDEN ACTIONS:
-Adding/removing dependencies not in vulnerability summary
-Changing plugins, properties, or configurations
-Modifying project structure or parent elements
-Reordering or reformatting existing content
-Including any text outside the pom.xml tags
+- Adding/removing dependencies not in vulnerability summary
+- Changing plugins, properties, or configurations
+- Modifying project structure or parent elements
+- Reordering or reformatting existing content
+- Including any text outside the pom.xml tags
+- Adding comments anywhere except directly above modified dependencies
+
 PROCESS:
-Identify vulnerable dependencies from Snyk summary
-Find latest secure compatible versions online
-Add required comment above each change
-Update only the version number
-Preserve everything else exactly
+1. Identify vulnerable dependencies from Snyk summary
+2. Find each dependency in the pom.xml
+3. Add comment directly above the <dependency> tag with same indentation
+4. Update only the version number in that dependency
+5. Preserve everything else exactly as is
+
 Snyk Vulnerability Summary:
 {{SNYK_SUMMARY}}
+
 Original pom.xml:
 {{POM_CONTENT}}
+
 Return the updated pom.xml immediately - no other text.
