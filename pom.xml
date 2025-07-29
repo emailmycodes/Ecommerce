@@ -1,4 +1,3 @@
---* Removed redundant version tags and updated dependencies according to the Snyk vulnerability summary *--
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -27,6 +26,7 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <version>3.4.7</version>
             <comment>Updated due to CVE-2025-48988: Allocation of Resources Without Limits or Throttling - Changed from inherited to 3.4.7</comment>
         </dependency>
         <dependency>
@@ -64,7 +64,7 @@
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-jackson</artifactId>
-            <version>0.12.0</version>
+            <version>0.11.5</version>
             <scope>runtime</scope>
         </dependency>
 
@@ -85,20 +85,12 @@
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <version>6.4.6</version>
-            <comment>Updated due to SNYK-JAVA-ORGSPRINGFRAMEWORKSECURITY-10185684: Missing Authentication for Critical Function - Changed from 6.4.5 to 6.4.6</comment>
+            <comment>Updated due to SNYK-JAVA-ORGSPRINGFRAMEWORKSECURITY-10185684 - Changed from 6.4.5 to 6.4.6</comment>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <scope>test</scope>
-        </dependency>
-
-        <!-- Added new dependency for tomcat-embed-core -->
-        <dependency>
-            <groupId>org.apache.tomcat.embed</groupId>
-            <artifactId>tomcat-embed-core</artifactId>
-            <version>11.0.9</version>
-            <comment>Updated due to CVE-2025-48988: Allocation of Resources Without Limits or Throttling - Changed from not present to 11.0.9</comment>
         </dependency>
     </dependencies>
 
