@@ -7,7 +7,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.4.5</version>
+		<version>3.4.7</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 
@@ -26,6 +26,7 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
+            <!-- Updated due to CVE-2025-48988: Allocation of Resources Without Limits or Throttling - Changed from inherited to 3.4.7 -->
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -83,6 +84,8 @@
 		<dependency>
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-test</artifactId>
+            <version>6.4.6</version>
+            <!-- Updated due to CVE-2025-41232: Missing Authentication for Critical Function - Changed from 6.4.5 to 6.4.6 -->
 			<scope>test</scope>
 		</dependency>
 		<dependency>
