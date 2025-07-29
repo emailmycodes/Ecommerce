@@ -45,7 +45,7 @@ def get_fix_from_mistral(summary, pom_content):
                 "content": prompt
             }
         ],
-        "temperature": 0.1,
+        "temperature": 0.2,
         "top_p": 0.9,
         "max_tokens": 3100,
         "frequency_penalty": 0.0,
