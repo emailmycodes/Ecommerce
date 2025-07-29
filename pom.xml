@@ -124,6 +124,41 @@
 					</excludes>
 				</configuration>
 			</plugin>
+
+			<!-- Update Tomcat -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>3.3.0</version>
+				<executions>
+					<execution>
+						<id>update-tomcat</id>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>update-dependencies</goal>
+						</goals>
+						<configuration>
+							<artifactItems>
+								<artifactItem>
+									<groupId>org.springframework.boot</groupId>
+									<artifactId>spring-boot-starter-web</artifactId>
+									<version>3.4.7</version>
+									<type>jar</type>
+								</artifactItem>
+							</artifactItems>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 </project>
+
+<!-- Updated due to CVE-2025-41232: Missing Authentication for Critical Function - Changed from 6.4.5 to 6.4.6 -->
+<dependency>
+	<groupId>org.springframework.security</groupId>
+	<artifactId>spring-security-core</artifactId>
+	<version>6.4.6</version>
+</dependency>
+
+<!-- Updated due to CVE-2025-48988: Allocation of Resources Without Limits or Throttling - Changed from 10.1.40 to 10.1
