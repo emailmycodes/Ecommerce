@@ -7,7 +7,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.4.5</version>
+		<version>3.4.6</version> <!-- Updated to include the latest security updates -->
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 
@@ -26,6 +26,7 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
+			<version>3.4.7</version> <!-- Updated due to CVE-2025-41232, as recommended by Snyk -->
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -73,6 +74,34 @@
 			<optional>true</optional>
 		</dependency>
 
+		<!-- Tomcat Embed -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-tomcat</artifactId>
+			<version>3.4.7</version> <!-- Updated due to CVE-2025-48988, CVE-2025-52520, CVE-2025-53506, as recommended by Snyk -->
+		</dependency>
+
+		<!-- Spring Context -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+			<version>6.2.7</version> <!-- Updated due to CVE-2025-41232, as recommended by Snyk -->
+		</dependency>
+
+		<!-- Spring Web -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-web</artifactId>
+			<version>6.2.8</version> <!-- Updated due to CVE-2025-41232, as recommended by Snyk -->
+		</dependency>
+
+		<!-- Spring Security Core -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-core</artifactId>
+			<version>6.4.6</version> <!-- Updated due to CVE-2025-41232, as recommended by Snyk -->
+		</dependency>
+
 		<!-- Test Dependencies -->
 
 		<dependency>
@@ -83,6 +112,7 @@
 		<dependency>
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-test</artifactId>
+			<version>6.4.6</version> <!-- Updated due to CVE-2025-41232, as recommended by Snyk -->
 			<scope>test</scope>
 		</dependency>
 		<dependency>
