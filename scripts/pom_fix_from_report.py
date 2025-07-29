@@ -10,6 +10,7 @@ REPO_NAME = os.getenv("GITHUB_REPO")
 
 # File paths
 SNYK_SUMMARY_PATH = sys.argv[1] if len(sys.argv) > 1 else "scripts/snyk-summary.txt"
+PROMPT_TEMPLATE_PATH = "scripts/agent-prompt.txt"
 POM_FILE = "pom.xml"
 
 # Mistral API config
@@ -19,45 +20,25 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-
 def read_file(file_path):
     """Reads and returns the contents of a file."""
     with open(file_path, "r") as f:
         return f.read()
 
-
 def get_fix_from_mistral(summary, pom_content):
     """
     Sends the Snyk summary and pom.xml content to Mistral AI and gets the fixed pom.xml.
-    Only modifies dependencies explicitly mentioned in the summary.
+    Ensures only affected dependencies are upgraded to latest secure versions.
     """
-    prompt = f"""You are an expert in Java and Maven.
-You are provided with:
-1. A vulnerability summary from Snyk.
-2. The contents of a pom.xml file.
-Your task is:
-- ONLY update the dependencies that are explicitly mentioned in the vulnerability summary.
-- For each updated dependency, add a comment directly above it explaining why the version was changed. Include references like CVE ID or a brief note like "recommended by Snyk".
-- DO NOT modify any other dependencies or content in the pom.xml — no formatting, indentation, plugin, or configuration changes.
-- DO NOT add, remove, or reorder any dependencies not included in the vulnerability summary.
-- DO NOT add any explanation outside the pom.xml.
-- Return ONLY the updated pom.xml with comments, nothing else.
-- Ensure the output is a Maven-valid pom.xml.
-
-### Vulnerability Summary:
-{summary}
-
-### Original pom.xml:
-{pom_content}
-
-### Updated pom.xml (ONLY with relevant changes, no explanations or other edits):"""
+    prompt_template = read_file(PROMPT_TEMPLATE_PATH)
+    prompt = prompt_template.replace("{{SNYK_SUMMARY}}", summary).replace("{{POM_CONTENT}}", pom_content)
 
     body = {
         "model": "mistral-small",
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful AI that improves Java pom.xml files based strictly on Snyk vulnerability summaries."
+                "content": "You are a helpful assistant that only upgrades Java Maven dependencies listed in a Snyk vulnerability summary to their secure latest versions, preserving structure and compatibility."
             },
             {
                 "role": "user",
@@ -66,14 +47,15 @@ Your task is:
         ],
         "temperature": 0.2,
         "top_p": 0.9,
-        "max_tokens": 2048
+        "max_tokens": 3100,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0
     }
 
     response = requests.post(MISTRAL_API_URL, headers=HEADERS, json=body)
     response.raise_for_status()
     result = response.json()
     return result["choices"][0]["message"]["content"].strip()
-
 
 def create_branch_and_commit(new_pom, original_pom):
     """
@@ -97,21 +79,20 @@ def create_branch_and_commit(new_pom, original_pom):
     pom_file = repo.get_contents(POM_FILE, ref=branch)
     repo.update_file(
         POM_FILE,
-        "fix: update pom.xml based on Snyk vulnerabilities",
+        "fix: update pom.xml based on Snyk vulnerabilities using Mistral",
         new_pom,
         pom_file.sha,
         branch=branch
     )
 
     repo.create_pull(
-        title="fix: auto-update pom.xml via Mistral AI",
-        body="This PR includes automatic fixes to pom.xml based on Snyk vulnerabilities using Mistral AI.",
+        title="fix: auto-update pom.xml via Mistral AI (Snyk fixes)",
+        body="This PR includes secure dependency upgrades in `pom.xml` based on Snyk vulnerability summary, powered by Mistral AI.",
         head=branch,
         base="main"
     )
 
-    print("Pull request created successfully.")
-
+    print("✅ Pull request created successfully.")
 
 if __name__ == "__main__":
     summary_text = read_file(SNYK_SUMMARY_PATH)
