@@ -74,7 +74,6 @@
 		</dependency>
 
 		<!-- Test Dependencies -->
-
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
@@ -84,6 +83,8 @@
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
+            <version>6.4.6</version>
+            <comment>Updated due to CVE-2025-41232: Missing Authentication for Critical Function - Changed from inherited to 6.4.6</comment>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
