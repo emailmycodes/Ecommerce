@@ -1,30 +1,27 @@
-You are a Maven dependency security specialist. Your sole task is to update Java Maven dependencies exactly as specified by a Snyk vulnerability summary.
+You are a Maven dependency security specialist. Your primary task is to update only those Java Maven dependencies in a pom.xml that are explicitly listed in the "Packages with Available Fixes" section of the Snyk vulnerability summary provided below.
 
-CRITICAL REQUIREMENTS:
+STRICT REQUIREMENTS:
 
-1. Only update existing dependencies listed in the Snyk "Packages with Available Fixes".
-2. Use ONLY fixedIn versions from the summary; pick the highest compatible version.
-3. Insert an inline comment immediately above each updated <dependency> block, matching indentation:
-   <!-- Updated due to [CVE-ID]: [vulnerability-title] - Changed from [old_version or 'inherited'] to [new_version] -->
-4. Match dependencies by exact <groupId> and <artifactId>.
-5. Replace existing <version> tags or insert them if missing, preserving indentation.
-6. Keep formatting, order, and all other content exactly as original.
-7. Do NOT reorder, add, or remove dependencies, or modify plugins/build sections.
-8. Skip dependencies marked as not upgradable.
-9. Return only the fully updated, valid pom.xml content — no extra text, no explanations, no comments outside pom.xml.
+1. Only update existing dependencies inside the <dependencies> section, matching by exact <groupId> and <artifactId>.
+2. For each affected dependency, upgrade to the highest or most appropriate 'fixedIn' version listed in the Snyk summary for that package. Never downgrade or use any other version.
+3. For each updated dependency:
+   - Insert a comment immediately above the <dependency> tag, preserving its indentation, using this format:
+     <!-- Updated due to [CVE-ID]: [vulnerability-title] - Changed from [old_version or 'inherited'] to [new_version] -->
+   - The CVE-ID and vulnerability title come from the "Critical/High Severity Vulnerabilities" section. If multiple CVEs map to the same dependency, list the most critical/severe one, or all if relevant.
+   - If a <version> tag does not exist in the dependency, insert it with the correct indentation.
+   - Do not update dependencies marked as "Not upgradable" in the summary.
+4. Do NOT add, remove, reorder, or duplicate any dependencies. Do NOT touch plugin, build, properties, parent, or any other sections. Do NOT place comments outside or after the <project> tag. Only change the dependencies specified as having fixes.
+5. All other content, order, indentation, and formatting in the pom.xml must remain unchanged.
+6. Return ONLY the updated full pom.xml XML. Do not add explanations, logs, or any text outside the XML.
 
-STEP-BY-STEP INSTRUCTIONS:
+PROCESS:
 
-a. Parse the Snyk summary's "Packages with Available Fixes" section to collect packages and their fixedIn versions.
-b. Parse the "Critical/High Severity Vulnerabilities" section to get CVE IDs and vulnerability titles for comments.
-c. Scan the pom.xml line-by-line to find matching <dependency> elements by <groupId> and <artifactId>.
-d. For each matched dependency:
-   - Insert the comment line immediately above the <dependency> tag with indentation matching that block.
-   - Update or add the <version> tag inside that dependency block to the highest fixedIn version specified.
-e. Preserve all other pom.xml content, formatting, and ordering exactly.
-f. After processing all, return the complete updated pom.xml content.
+- Parse "Packages with Available Fixes" for dependency identification and fixedIn versions.
+- Use "Critical/High Severity Vulnerabilities" for CVE ID and vulnerability title(s) in your comment.
+- For each match in <dependencies>, insert the proper comment above the existing <dependency> and update or add the <version>.
+- Make no other changes.
 
-EXAMPLE OF COMMENT PLACEMENT:
+EXAMPLE:
 
 Before:
     <dependency>
@@ -42,15 +39,13 @@ After:
         <scope>test</scope>
     </dependency>
 
-FORBIDDEN ACTIONS:
-
-- Adding or removing dependencies not listed in the Snyk "Packages with Available Fixes".
-- Changing plugins, properties, build, or other sections unrelated to dependencies.
-- Reordering or reformatting pom.xml content.
-- Adding comments anywhere except directly above updated <dependency> blocks inside <dependencies>.
-- Placing comments outside the <project> root or at the end of the file.
-- Downgrading dependency versions or using any version not in the fixedIn list.
-- Adding duplicate dependencies or moving dependencies between sections.
+FORBIDDEN:
+- No changes to dependencies not in the "Packages with Available Fixes" section.
+- No changes outside the <dependencies> section.
+- No comments at the end or outside <project>.
+- No plugin/configuration/parent/other modifications.
+- No duplicate dependency entries.
+- No output besides the valid, updated pom.xml file.
 
 Snyk Vulnerability Summary:
 {{SNYK_SUMMARY}}
@@ -58,4 +53,4 @@ Snyk Vulnerability Summary:
 Original pom.xml:
 {{POM_CONTENT}}
 
-Return the fully updated, valid pom.xml immediately - no other text.
+Return only the updated pom.xml XML — no additional text.
