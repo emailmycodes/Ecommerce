@@ -2,10 +2,10 @@ import os
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 from collections import defaultdict
 
-# Configurable paths
+# Configurable input/output paths
 INPUT_FILE = Path("snyk-results.json")
 OUTPUT_FILE = Path("scripts/snyk-summary.txt")
 
@@ -27,9 +27,8 @@ def load_snyk_results(file_path: Path) -> Dict[str, Any]:
         logging.error(f"Failed to load Snyk results: {e}")
         return {}
 
-def extract_remediation_upgrades(remediation_section: Dict[str, Any]) -> str:
-    """Extract remediation upgrade details for direct dependencies."""
-    upgrades = remediation_section.get("upgrade", {})
+def extract_remediation_upgrades(remediation: Dict[str, Any]) -> str:
+    upgrades = remediation.get("upgrade", {})
     if not upgrades:
         return ""
 
@@ -37,9 +36,9 @@ def extract_remediation_upgrades(remediation_section: Dict[str, Any]) -> str:
     for dep, upgrade_info in upgrades.items():
         upgrade_to = upgrade_info.get("upgradeTo", "")
         upgraded_vulns = upgrade_info.get("vulns", [])
-        lines.append(f"- {dep} -> {upgrade_to}")
-        # Optionally, list vulnerable sub-dependencies fixed by this upgrade if any:
         ups = upgrade_info.get("upgrades", [])
+
+        lines.append(f"- {dep} -> {upgrade_to}")
         if ups:
             for u in ups:
                 lines.append(f"  - Upgrades {u}")
@@ -48,16 +47,54 @@ def extract_remediation_upgrades(remediation_section: Dict[str, Any]) -> str:
         lines.append("")
     return "\n".join(lines)
 
+def extract_jwt_transitive_vulns(vulnerabilities: List[Dict[str, Any]], jwt_groupid: str = "io.jsonwebtoken") -> str:
+    """Find vulnerabilities introduced transitively via JWT or similar."""
+    found = []
+
+    for vuln in vulnerabilities:
+        from_chain = vuln.get("from", [])
+        for p in from_chain:
+            if p.startswith(jwt_groupid + ":"):
+                # Record relevant info
+                found.append({
+                    "vuln_id": vuln.get("id"),
+                    "title": vuln.get("title"),
+                    "cves": vuln.get("identifiers", {}).get("CVE", []),
+                    "path": " › ".join(from_chain),
+                    "fixedIn": vuln.get("fixedIn", []),
+                    "isUpgradable": vuln.get("isUpgradable", False),
+                    "pkg": vuln.get("packageName", vuln.get("package")),
+                    "version": vuln.get("version", "unknown")
+                })
+                break
+    if not found:
+        return ""
+
+    lines = ["Transitive Vulnerabilities via JWT Libraries:"]
+    for f in found:
+        cve_str = ", ".join(f["cves"]) if f["cves"] else "N/A"
+        fixed_versions = ", ".join(f["fixedIn"]) if f["fixedIn"] else "None"
+        upgradable = "Yes" if f["isUpgradable"] else "No"
+
+        lines.append(f"- JWT Dependency: {f['path']}")
+        lines.append(f"  - Vulnerability: {f['title']} (CVEs: {cve_str})")
+        lines.append(f"  - Current Package/Version: {f['pkg']}@{f['version']}")
+        lines.append(f"  - Fixed Versions: {fixed_versions}")
+        lines.append(f"  - Upgradable: {upgradable}")
+        lines.append("")
+
+    return "\n".join(lines)
+
 def extract_vulnerability_analysis(data: Dict[str, Any]) -> str:
     vulnerabilities = data.get("vulnerabilities", [])
     remediation = data.get("remediation", {})
 
-    # Severity breakdown counts
+    # Severity counts
     severity_counts = defaultdict(int)
     for vuln in vulnerabilities:
-        severity = vuln.get("severity", "").lower()
-        if severity:
-            severity_counts[severity] += 1
+        sev = vuln.get("severity", "").lower()
+        if sev:
+            severity_counts[sev] += 1
 
     upgradable = len(remediation.get("upgrade", {}))
     unresolved = len(remediation.get("unresolved", []))
@@ -65,43 +102,44 @@ def extract_vulnerability_analysis(data: Dict[str, Any]) -> str:
     # Packages with available fixes
     packages_fix_versions = defaultdict(set)
     for vuln in vulnerabilities:
-        pkg_name = vuln.get("packageName") or vuln.get("package") or vuln.get("packageManager") or "unknown"
+        pkg_name = vuln.get("packageName") or vuln.get("package") or "unknown"
         fixed_versions = vuln.get("fixedIn", [])
         if isinstance(fixed_versions, list):
-            for ver in fixed_versions:
-                if ver:
-                    packages_fix_versions[pkg_name].add(ver)
+            for v in fixed_versions:
+                if v:
+                    packages_fix_versions[pkg_name].add(v)
 
-    pkg_fix_output = []
-    for pkg, versions in sorted(packages_fix_versions.items()):
-        ver_list = sorted(versions)
+    pkg_fix_lines = []
+    for pkg, vers in sorted(packages_fix_versions.items()):
+        ver_list = sorted(vers)
         if ver_list:
-            pkg_fix_output.append(f"- {pkg}:")
-            pkg_fix_output.append(f"  - Fixed in: {', '.join(ver_list)}")
+            pkg_fix_lines.append(f"- {pkg}:")
+            pkg_fix_lines.append(f"  - Fixed in: {', '.join(ver_list)}")
 
-    # Extract critical/high vulnerabilities with details
+    # Critical/high severity vulns
     crit_high_vulns = [
-        vuln for vuln in vulnerabilities
-        if vuln.get("severity", "").lower() in ("critical", "high")
+        v for v in vulnerabilities if v.get("severity", "").lower() in ("critical", "high")
     ]
-    crit_high_output = []
+
+    crit_high_lines = []
     for vuln in crit_high_vulns:
         title = vuln.get("title", "Unknown vulnerability")
-        cve_ids = vuln.get("identifiers", {}).get("CVE", [])
-        cve_str = f" ({', '.join(cve_ids)})" if cve_ids else ""
+        cves = vuln.get("identifiers", {}).get("CVE", [])
+        cve_str = f" ({', '.join(cves)})" if cves else ""
         pkg_name = vuln.get("packageName", vuln.get("package", "unknown"))
-        current_version = vuln.get("version") or "unknown"
+        curr_ver = vuln.get("version", "unknown")
+        cvss = vuln.get("cvssScore", "N/A")
         fixed_versions = vuln.get("fixedIn", [])
-        fixed_versions_str = ", ".join(str(v) for v in fixed_versions) if fixed_versions else "N/A"
-        upgradable_flag = vuln.get("isUpgradable", False)
-        cvss_score = vuln.get("cvssScore", "N/A")
+        fixed_str = ", ".join(str(v) for v in fixed_versions) if fixed_versions else "N/A"
+        upgradable = "Yes" if vuln.get("isUpgradable", False) else "No"
 
-        crit_high_output.append(f"- {title}{cve_str}")
-        crit_high_output.append(f"  - Package: {pkg_name}@{current_version}")
-        crit_high_output.append(f"  - CVSS Score: {cvss_score}")
-        crit_high_output.append(f"  - Fixed in: {fixed_versions_str}")
-        crit_high_output.append(f"  - Upgradable: {'Yes' if upgradable_flag else 'No'}")
+        crit_high_lines.append(f"- {title}{cve_str}")
+        crit_high_lines.append(f"  - Package: {pkg_name}@{curr_ver}")
+        crit_high_lines.append(f"  - CVSS Score: {cvss}")
+        crit_high_lines.append(f"  - Fixed in: {fixed_str}")
+        crit_high_lines.append(f"  - Upgradable: {upgradable}")
 
+    # Compose full output
     lines = [
         "Vulnerability Analysis",
         "",
@@ -117,16 +155,23 @@ def extract_vulnerability_analysis(data: Dict[str, Any]) -> str:
         "",
         "Packages with Available Fixes:"
     ]
-    lines.extend(pkg_fix_output)
+    lines.extend(pkg_fix_lines)
     lines.append("")
     lines.append("Critical/High Severity Vulnerabilities:")
-    lines.extend(crit_high_output)
+    lines.extend(crit_high_lines)
     lines.append("")
 
-    # Append remediation upgrade summary (direct dependency upgrades like spring-boot-starter-web)
-    remediation_upgrades_text = extract_remediation_upgrades(remediation)
-    if remediation_upgrades_text:
-        lines.append(remediation_upgrades_text)
+    # Add remediation upgrade info
+    remediation_upgrades = extract_remediation_upgrades(remediation)
+    if remediation_upgrades:
+        lines.append(remediation_upgrades)
+        lines.append("")
+
+    # Add JWT transitive vulns if any
+    jwt_vulns = extract_jwt_transitive_vulns(vulnerabilities)
+    if jwt_vulns:
+        lines.append(jwt_vulns)
+        lines.append("")
 
     return "\n".join(lines)
 
@@ -141,13 +186,12 @@ def main() -> None:
         logging.warning("No valid Snyk project data to summarize.")
         return
 
-    # Process multiple projects if input is a list
     if isinstance(projects, list):
-        results_text = "\n\n".join([extract_vulnerability_analysis(p) for p in projects])
+        summary_text = "\n\n".join([extract_vulnerability_analysis(p) for p in projects])
     else:
-        results_text = extract_vulnerability_analysis(projects)
+        summary_text = extract_vulnerability_analysis(projects)
 
-    write_summary(results_text, OUTPUT_FILE)
+    write_summary(summary_text, OUTPUT_FILE)
 
 if __name__ == "__main__":
     main()
