@@ -22,7 +22,11 @@ REQUIREMENTS:
 
 9. Never downgrade versions.
 
-10. Return only the full updated pom.xml XML content with inline comments and version updates.
+10. If some vulnerabilities in the Snyk summary are marked as "not upgradable," do NOT attempt to fix or comment them.
+
+11. The goal is to fix all automatable direct dependency vulnerabilities; unresolved or non-upgradable vulnerabilities require manual intervention outside of this automated fix.
+
+12. Return only the full updated pom.xml XML content with inline comments and version updates.
 
 INPUT VARIABLES:
 
@@ -32,7 +36,7 @@ INPUT VARIABLES:
 
 OUTPUT:
 
-Return the fully updated valid pom.xml XML, adhering to the instructions, with no additional text.
+Return the fully updated valid pom.xml XML adhering to these instructions with no additional text.
 
 Example of updated dependency:
 
