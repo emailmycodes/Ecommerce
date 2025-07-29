@@ -93,6 +93,14 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Added new dependency for tomcat-embed-core -->
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-core</artifactId>
+            <version>11.0.9</version>
+            <comment>Updated due to CVE-2025-48988: Allocation of Resources Without Limits or Throttling - Changed from not present to 11.0.9</comment>
+        </dependency>
     </dependencies>
 
     <build>
