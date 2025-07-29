@@ -27,6 +27,27 @@ def load_snyk_results(file_path: Path) -> Dict[str, Any]:
         logging.error(f"Failed to load Snyk results: {e}")
         return {}
 
+def extract_remediation_upgrades(remediation_section: Dict[str, Any]) -> str:
+    """Extract remediation upgrade details for direct dependencies."""
+    upgrades = remediation_section.get("upgrade", {})
+    if not upgrades:
+        return ""
+
+    lines = ["Recommended Upgrades:"]
+    for dep, upgrade_info in upgrades.items():
+        upgrade_to = upgrade_info.get("upgradeTo", "")
+        upgraded_vulns = upgrade_info.get("vulns", [])
+        lines.append(f"- {dep} -> {upgrade_to}")
+        # Optionally, list vulnerable sub-dependencies fixed by this upgrade if any:
+        ups = upgrade_info.get("upgrades", [])
+        if ups:
+            for u in ups:
+                lines.append(f"  - Upgrades {u}")
+        if upgraded_vulns:
+            lines.append(f"  - Fixes vulnerabilities: {', '.join(upgraded_vulns)}")
+        lines.append("")
+    return "\n".join(lines)
+
 def extract_vulnerability_analysis(data: Dict[str, Any]) -> str:
     vulnerabilities = data.get("vulnerabilities", [])
     remediation = data.get("remediation", {})
@@ -55,8 +76,8 @@ def extract_vulnerability_analysis(data: Dict[str, Any]) -> str:
     for pkg, versions in sorted(packages_fix_versions.items()):
         ver_list = sorted(versions)
         if ver_list:
-            pkg_fix_output.append(f"  - {pkg}:")
-            pkg_fix_output.append(f"    - Fixed in: {', '.join(ver_list)}")
+            pkg_fix_output.append(f"- {pkg}:")
+            pkg_fix_output.append(f"  - Fixed in: {', '.join(ver_list)}")
 
     # Extract critical/high vulnerabilities with details
     crit_high_vulns = [
@@ -65,38 +86,47 @@ def extract_vulnerability_analysis(data: Dict[str, Any]) -> str:
     ]
     crit_high_output = []
     for vuln in crit_high_vulns:
-        title = vuln.get("title", "Unknown Vulnerability")
+        title = vuln.get("title", "Unknown vulnerability")
         cve_ids = vuln.get("identifiers", {}).get("CVE", [])
         cve_str = f" ({', '.join(cve_ids)})" if cve_ids else ""
-        pkg_version = vuln.get("packageName", vuln.get("package", "unknown"))
+        pkg_name = vuln.get("packageName", vuln.get("package", "unknown"))
         current_version = vuln.get("version") or "unknown"
-        severity_title = vuln.get("severity", "").capitalize()
         fixed_versions = vuln.get("fixedIn", [])
         fixed_versions_str = ", ".join(str(v) for v in fixed_versions) if fixed_versions else "N/A"
         upgradable_flag = vuln.get("isUpgradable", False)
+        cvss_score = vuln.get("cvssScore", "N/A")
 
-        crit_high_output.append(f"  - {title}{cve_str}")
-        crit_high_output.append(f"    - Package: {pkg_version}@{current_version}")
-        crit_high_output.append(f"    - CVSS Score: {vuln.get('cvssScore', 'N/A')}")
-        crit_high_output.append(f"    - Fixed in: {fixed_versions_str}")
-        crit_high_output.append(f"    - Upgradable: {'Yes' if upgradable_flag else 'No'}")
+        crit_high_output.append(f"- {title}{cve_str}")
+        crit_high_output.append(f"  - Package: {pkg_name}@{current_version}")
+        crit_high_output.append(f"  - CVSS Score: {cvss_score}")
+        crit_high_output.append(f"  - Fixed in: {fixed_versions_str}")
+        crit_high_output.append(f"  - Upgradable: {'Yes' if upgradable_flag else 'No'}")
 
     lines = [
         "Vulnerability Analysis",
         "",
-        "- Severity Breakdown:",
-        f"  - Critical: {severity_counts.get('critical', 0)}",
-        f"  - High: {severity_counts.get('high', 0)}",
-        f"  - Medium: {severity_counts.get('medium', 0)}",
-        f"  - Low: {severity_counts.get('low', 0)}",
-        "- Remediation Status:",
-        f"  - Upgradable: {upgradable}",
-        f"  - Unresolved: {unresolved}",
-        "- Packages with Available Fixes:"
+        "Severity Breakdown:",
+        f"  Critical: {severity_counts.get('critical', 0)}",
+        f"  High: {severity_counts.get('high', 0)}",
+        f"  Medium: {severity_counts.get('medium', 0)}",
+        f"  Low: {severity_counts.get('low', 0)}",
+        "",
+        "Remediation Status:",
+        f"  Upgradable: {upgradable}",
+        f"  Unresolved: {unresolved}",
+        "",
+        "Packages with Available Fixes:"
     ]
-    lines += pkg_fix_output
-    lines.append("- Critical/High Severity Vulnerabilities:")
-    lines += crit_high_output
+    lines.extend(pkg_fix_output)
+    lines.append("")
+    lines.append("Critical/High Severity Vulnerabilities:")
+    lines.extend(crit_high_output)
+    lines.append("")
+
+    # Append remediation upgrade summary (direct dependency upgrades like spring-boot-starter-web)
+    remediation_upgrades_text = extract_remediation_upgrades(remediation)
+    if remediation_upgrades_text:
+        lines.append(remediation_upgrades_text)
 
     return "\n".join(lines)
 
@@ -110,11 +140,13 @@ def main() -> None:
     if not projects:
         logging.warning("No valid Snyk project data to summarize.")
         return
-    # Handle both array and single project JSON
+
+    # Process multiple projects if input is a list
     if isinstance(projects, list):
         results_text = "\n\n".join([extract_vulnerability_analysis(p) for p in projects])
     else:
         results_text = extract_vulnerability_analysis(projects)
+
     write_summary(results_text, OUTPUT_FILE)
 
 if __name__ == "__main__":
