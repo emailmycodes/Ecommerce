@@ -26,18 +26,22 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
+			<version>3.4.7</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
+			<version>3.4.5</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
+			<version>3.4.5</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
+			<version>3.4.5</version>
 		</dependency>
 
 		<!-- H2 In-Memory Database -->
@@ -45,6 +49,7 @@
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
 			<scope>runtime</scope>
+			<version>2.1.212</version>
 		</dependency>
 
 		<!-- JJWT (Java JWT from io.jsonwebtoken) -->
@@ -71,6 +76,7 @@
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
+			<version>1.18.30</version>
 		</dependency>
 
 		<!-- Test Dependencies -->
@@ -79,16 +85,19 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
+			<version>3.4.7</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
+			<version>6.4.6</version>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
 			<scope>test</scope>
+			<version>4.13.2</version>
 		</dependency>
 	</dependencies>
 
@@ -127,3 +136,5 @@
 		</plugins>
 	</build>
 </project>
+<!-- Updated due to CVE-2025-41232: Missing Authentication for Critical Function - Changed from 6.4.5 to 6.4.6 -->
+<!-- Updated due to CVE-2025-48988: Allocation of Resources Without Limits or Throttling - Changed from 10.1.40 to 10.1.42 -->
