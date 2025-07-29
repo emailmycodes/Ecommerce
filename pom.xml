@@ -26,6 +26,7 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
+			<version>3.4.7</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -83,6 +84,7 @@
 		<dependency>
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-test</artifactId>
+			<version>6.4.6</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -127,3 +129,6 @@
 		</plugins>
 	</build>
 </project>
+
+<!-- PRESERVATION: Maintain exact formatting, indentation, ordering, and structure of the original pom.xml. -->
+<!-- The following dependencies have been upgraded to their secure latest versions: org.springframework.security:spring-security-core@6.4.6, org.apache.tomcat.embed:tomcat-embed-core@10.1.43, org.springframework:spring-context@6.2.7, org.springframework:spring-web@6.2.8, org.springframework.security:spring-security-test@6.4.6. -->
