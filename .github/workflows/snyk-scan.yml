@@ -19,29 +19,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Install Maven and the latest version of Snyk CLI
       - name: Install Maven and Snyk
         run: |
           sudo apt-get update && sudo apt-get install -y maven
           npm install -g snyk@latest
 
-      # Authenticate Snyk CLI using your SNYK_TOKEN
       - name: Authenticate Snyk
         run: snyk config set api="$SNYK_TOKEN"
 
-      # Run the Snyk scan and generate a JSON report, don't fail the job on vulnerabilities
       - name: Run Snyk test and generate JSON
         run: |
           snyk test --file=pom.xml --json-file-output=snyk-results.json --quiet || true
 
-      # Fallback: If JSON is missing or empty, create an empty vulnerability report
       - name: Ensure JSON exists
         run: |
           if [ ! -s snyk-results.json ]; then
             echo '{"ok":true,"vulnerabilities":[]}' > snyk-results.json
           fi
 
-      # Upload the Snyk results as an artifact to be used by the next job
       - name: Upload snyk-results.json
         uses: actions/upload-artifact@v4
         with:
@@ -57,28 +52,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Download the Snyk JSON artifact from the previous job
       - name: Download snyk-results.json
         uses: actions/download-artifact@v4
         with:
           name: snyk-json
           path: scripts
 
-      # Set up Python for running the summary script
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: 3.x
 
-      # Install dependencies required for summarizing (PyGithub)
       - name: Install dependencies
         run: pip install pygithub
 
-      # Run the summarization Python script
       - name: Run summarizer script
         run: python scripts/summarize_snyk_report.py
 
-      # Upload the summarized Snyk report for the next job
       - name: Upload snyk-summary.txt
         uses: actions/upload-artifact@v4
         with:
@@ -100,23 +90,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Download the snyk-summary.txt generated in previous step
       - name: Download snyk-summary.txt
         uses: actions/download-artifact@v4
         with:
           name: snyk-summary
           path: scripts
 
-      # Set up Python again for the fix step
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: 3.x
 
-      # Install necessary Python dependencies for the fix script
       - name: Install dependencies
         run: pip install requests pygithub
 
-      # Execute the Python script that sends summary to Mistral AI for pom.xml correction
       - name: Run fix agent
         run: python scripts/pom_fix_from_report.py
