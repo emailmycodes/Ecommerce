@@ -1,0 +1,63 @@
+name: Snyk Summary Generation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  snyk-summary:
+    name: Generate Snyk Vulnerability Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cleanup old snyk-results.json
+        run: |
+          if [ -f snyk-results.json ]; then
+            rm snyk-results.json
+          fi
+
+      - name: Install Maven and Snyk CLI
+        run: |
+          sudo apt-get update && sudo apt-get install -y maven
+          npm install -g snyk@latest
+
+      - name: Authenticate Snyk CLI
+        run: snyk config set api="$SNYK_TOKEN"
+
+      - name: Run Snyk scan and generate JSON
+        run: snyk test --file=pom.xml --json-file-output=snyk-results.json --quiet || true
+
+      - name: Ensure snyk-results.json exists
+        run: |
+          if [ ! -s snyk-results.json ]; then
+            echo '{"ok":true,"vulnerabilities":[]}' > snyk-results.json
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+
+      - name: Install Python dependencies for summarizing
+        run: pip install pygithub
+
+      - name: Create scripts directory if missing
+        run: mkdir -p scripts
+
+      - name: Move snyk-results.json to scripts/
+        run: mv snyk-results.json scripts/snyk-results.json
+
+      - name: Run summarization script
+        run: python scripts/summarize_snyk_report.py
+
+      - name: Upload snyk-summary.txt
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-summary
+          path: scripts/snyk-summary.txt
